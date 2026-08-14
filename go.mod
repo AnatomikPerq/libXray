@@ -3,6 +3,7 @@ module github.com/xtls/libxray
 go 1.26.3
 
 require (
+	github.com/dmitrymodder/minewire-cli v0.0.0-20260715100648-04457c34523f
 	github.com/metacubex/age v0.0.0-20260603010618-28d156b4ea78
 	github.com/stretchr/testify v1.11.1
 	github.com/xtls/xray-core v1.260327.1-0.20260728075948-5ca6f4b7d4dc
@@ -19,6 +20,7 @@ require (
 	github.com/google/btree v1.1.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
+	github.com/hashicorp/yamux v0.1.1 // indirect
 	github.com/juju/ratelimit v1.0.2 // indirect
 	github.com/klauspost/compress v1.17.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect

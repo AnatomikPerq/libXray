@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/xtls/libxray/geo"
+	"github.com/xtls/libxray/minewire"
 	"github.com/xtls/libxray/nodep"
 	"github.com/xtls/libxray/share"
 	"github.com/xtls/libxray/xray"
@@ -57,6 +58,18 @@ func Invoke(requestJSON string) string {
 		return encodeInvokeResponse(&XrayVersionResponse{Version: xray.XrayVersion()}, nil)
 	case LibXrayMethodGetXrayState:
 		return encodeInvokeResponse(&GetXrayStateResponse{Running: xray.GetXrayState()}, nil)
+	case LibXrayMethodStartMinewire:
+		return invokeStartMinewire(request.Payload)
+	case LibXrayMethodStopMinewire:
+		return encodeInvokeNoDataResponse(minewire.Stop())
+	case LibXrayMethodMinewireState:
+		running, connected, localAddr, lastError := minewire.State()
+		return encodeInvokeResponse(&MinewireStateResponse{
+			Running:   running,
+			Connected: connected,
+			LocalAddr: localAddr,
+			LastError: lastError,
+		}, nil)
 	default:
 		return encodeInvokeResponse(nil, errors.New("unknown method"))
 	}
@@ -223,6 +236,23 @@ func invokeTestXray(payload json.RawMessage) string {
 	}
 	err = xray.TestXray(request.XrayJson)
 	return encodeInvokeNoDataResponse(err)
+}
+
+func invokeStartMinewire(payload json.RawMessage) string {
+	request, err := decodePayload[StartMinewireRequest](payload)
+	if err != nil {
+		return encodeInvokeResponse(nil, err)
+	}
+	port, err := minewire.Start(minewire.StartOptions{
+		ServerAddress: request.ServerAddress,
+		Password:      request.Password,
+		Mode:          request.Mode,
+		LocalPort:     request.LocalPort,
+	})
+	if err != nil {
+		return encodeInvokeResponse(nil, err)
+	}
+	return encodeInvokeResponse(&StartMinewireResponse{LocalPort: port}, nil)
 }
 
 func invokeRunXray(payload json.RawMessage) string {

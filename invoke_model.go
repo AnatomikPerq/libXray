@@ -19,6 +19,9 @@ const (
 	LibXrayMethodStopXray                    LibXrayMethod = "stopXray"
 	LibXrayMethodXrayVersion                 LibXrayMethod = "xrayVersion"
 	LibXrayMethodGetXrayState                LibXrayMethod = "getXrayState"
+	LibXrayMethodStartMinewire               LibXrayMethod = "startMinewire"
+	LibXrayMethodStopMinewire                LibXrayMethod = "stopMinewire"
+	LibXrayMethodMinewireState               LibXrayMethod = "minewireState"
 )
 
 type LibXrayInvokeRequest struct {
@@ -97,6 +100,28 @@ type PingBatchItemResponse struct {
 
 type RunXrayRequest struct {
 	XrayJson string `json:"xrayJson,omitempty"`
+}
+
+// StartMinewireRequest describes one minewire node.
+//
+// The address should already be resolved by the caller: once the tunnel is
+// up, DNS may itself depend on the tunnel that is not working yet.
+type StartMinewireRequest struct {
+	ServerAddress string `json:"serverAddress,omitempty"`
+	Password      string `json:"password,omitempty"`
+	Mode          string `json:"mode,omitempty"`
+	LocalPort     int    `json:"localPort,omitempty"`
+}
+
+type StartMinewireResponse struct {
+	LocalPort int `json:"localPort"`
+}
+
+type MinewireStateResponse struct {
+	Running   bool   `json:"running"`
+	Connected bool   `json:"connected"`
+	LocalAddr string `json:"localAddr,omitempty"`
+	LastError string `json:"lastError,omitempty"`
 }
 
 type TestXrayRequest struct {

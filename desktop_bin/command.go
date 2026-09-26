@@ -15,6 +15,8 @@ type runOptions struct {
 	interfaceName string
 	configPath    string
 	errorFile     string
+	stopFile      string
+	configSHA256  string
 }
 
 func parseRunOptions(args []string) (runOptions, error) {
@@ -29,6 +31,8 @@ func parseRunOptions(args []string) (runOptions, error) {
 	flags.StringVar(&options.interfaceName, "interface", "", "outbound network interface")
 	flags.StringVar(&options.configPath, "config", "", "Xray JSON configuration path")
 	flags.StringVar(&options.errorFile, "error-file", "", "also write command errors to this file")
+	flags.StringVar(&options.stopFile, "stop-file", "", "stop gracefully once this file appears")
+	flags.StringVar(&options.configSHA256, "config-sha256", "", "refuse a config with another SHA-256")
 	if err := flags.Parse(args[1:]); err != nil {
 		return options, err
 	}
@@ -44,12 +48,27 @@ func parseRunOptions(args []string) (runOptions, error) {
 	if (options.dns == "") != (options.interfaceName == "") {
 		return options, errors.New("dns and interface must be given together")
 	}
+	if options.configSHA256 != "" && !isSHA256Hex(options.configSHA256) {
+		return options, errors.New("config-sha256 must be 64 hex characters")
+	}
 	return options, nil
+}
+
+func isSHA256Hex(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	for _, c := range value {
+		if !('0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F') {
+			return false
+		}
+	}
+	return true
 }
 
 func execute(args []string, run func(runOptions) error, stdout, stderr io.Writer) int {
 	usage := func() {
-		fmt.Fprintln(stdout, "Usage: xray run [-dns <IP:port> -interface <name>] -config <xray.json> [-error-file <path>]")
+		fmt.Fprintln(stdout, "Usage: xray run [-dns <IP:port> -interface <name>] -config <xray.json> [-config-sha256 <hex>] [-error-file <path>] [-stop-file <path>]")
 	}
 	if len(args) == 1 && (args[0] == "-h" || args[0] == "--help") {
 		usage()
@@ -61,21 +80,25 @@ func execute(args []string, run func(runOptions) error, stdout, stderr io.Writer
 		usage()
 		return 0
 	}
+	var diagnostics *os.File
 	if err == nil && options.errorFile != "" {
 		// Clear the previous failure before starting. Reuse a caller-created file
-		// so an elevated process preserves the caller's read permissions.
-		if err := os.WriteFile(options.errorFile, nil, 0600); err != nil {
+		// so an elevated process preserves the caller's read permissions, and
+		// write only through this verified handle.
+		diagnostics, err = openOwnedFile(options.errorFile, os.O_TRUNC)
+		if err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
+		defer diagnostics.Close()
 	}
 	if err == nil {
 		err = run(options)
 	}
 	if err != nil {
 		fmt.Fprintln(stderr, err)
-		if options.errorFile != "" {
-			if writeErr := os.WriteFile(options.errorFile, []byte(err.Error()), 0600); writeErr != nil {
+		if diagnostics != nil {
+			if _, writeErr := diagnostics.WriteString(err.Error()); writeErr != nil {
 				fmt.Fprintln(stderr, writeErr)
 			}
 		}

@@ -13,6 +13,7 @@ class WindowsBuilder(Builder):
         create_dir_if_not_exists(self.framework_dir)
         self.lib_file = "libXray.dll"
         self.lib_header_file = "libXray.h"
+        self.bin_file = "xray.exe"
 
     def before_build(self):
         super().before_build()
@@ -23,11 +24,9 @@ class WindowsBuilder(Builder):
         try:
             self.before_build()
             self.build_windows()
+            self.build_desktop_bin(self.bin_file)
         finally:
-            try:
-                self.after_build()
-            finally:
-                self.restore_go_env()
+            self.restore_go_env()
 
     def build_windows(self):
         output_dir = self.framework_dir

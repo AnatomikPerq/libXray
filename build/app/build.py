@@ -2,14 +2,15 @@ import os.path
 import subprocess
 
 from app.cmd import (
+    create_dir_if_not_exists,
     delete_file_if_exists,
     delete_dir_if_exists,
 )
 
 LIBXRAY_MOD_NAME = "github.com/xtls/libxray"
 XRAY_CORE_MOD_NAME = "github.com/xtls/xray-core"
-# Go modules resolve the Xray-core v26.7.28 release tag through this version.
-DEFAULT_XRAY_CORE_VERSION = "v1.260327.1-0.20260728075948-5ca6f4b7d4dc"
+# Go modules resolve the Xray-core v26.9.9 release tag through this version.
+DEFAULT_XRAY_CORE_VERSION = "v1.260327.1-0.20260908222543-52a412d9e2f5"
 LOCAL_XRAY_CORE_DIR_NAME = "Xray-core"
 
 
@@ -114,6 +115,7 @@ class Builder(object):
             raise Exception("download_geo failed")
 
     def prepare_gomobile(self):
+        requested_version = os.environ.get("LIBXRAY_GOMOBILE_VERSION") or "latest"
         result = subprocess.run(
             [
                 "go",
@@ -121,14 +123,14 @@ class Builder(object):
                 "-m",
                 "-f",
                 "{{.Version}}",
-                "golang.org/x/mobile@latest",
+                f"golang.org/x/mobile@{requested_version}",
             ],
             capture_output=True,
             text=True,
         )
         version = result.stdout.strip()
         if result.returncode != 0 or not version:
-            raise Exception("resolve latest gomobile version failed")
+            raise Exception("resolve gomobile version failed")
 
         ret = subprocess.run(
             [
@@ -162,13 +164,31 @@ class Builder(object):
     def main_package(self) -> str:
         return "./cgo_bridge"
 
+    def build_desktop_bin(self, file_name: str):
+        output_dir = os.path.join(self.lib_dir, "bin")
+        create_dir_if_not_exists(output_dir)
+        output_file = os.path.join(output_dir, file_name)
+        run_env = os.environ.copy()
+        run_env["CGO_ENABLED"] = "0"
+        cmd = [
+            "go",
+            "build",
+            "-trimpath",
+            "-buildvcs=false",
+            "-ldflags",
+            "-s -w -buildid=",
+            f"-o={output_file}",
+            "./desktop_bin",
+        ]
+        print(cmd)
+        ret = subprocess.run(cmd, cwd=self.lib_dir, env=run_env)
+        if ret.returncode != 0:
+            raise Exception("build_desktop_bin failed")
+
     def before_build(self):
         self.prepare_xray_core()
         self.init_go_env()
         self.download_geo()
 
     def build(self):
-        pass
-
-    def after_build(self):
         pass

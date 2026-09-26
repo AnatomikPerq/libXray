@@ -34,22 +34,20 @@ func newXrayInstance(xrayJSON string) (*core.Instance, error) {
 
 // Run Xray instance.
 // xrayJSON is the serialized Xray JSON configuration.
-func RunXray(xrayJSON string) (err error) {
+func RunXray(xrayJSON string) error {
 	coreServerMu.Lock()
 	defer coreServerMu.Unlock()
 	if coreServer != nil {
 		return ErrAlreadyRunning
 	}
-
 	memory.InitForceFree()
 	server, err := newXrayInstance(xrayJSON)
 	if err != nil {
-		return
+		return err
 	}
-
 	if err = server.Start(); err != nil {
 		_ = server.Close()
-		return
+		return err
 	}
 	coreServer = server
 

@@ -1,11 +1,13 @@
 // libXray is an Xray wrapper focusing on improving the experience of Xray-core mobile development.
 package libXray
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 type LibXrayMethod string
 
-const LibXrayAPIVersion = 2
+const LibXrayAPIVersion = 3
 
 const (
 	LibXrayMethodGetFreePorts                LibXrayMethod = "getFreePorts"
@@ -31,7 +33,8 @@ type LibXrayInvokeRequest struct {
 }
 
 type GetFreePortsRequest struct {
-	Count int `json:"count,omitempty"`
+	Count        int   `json:"count,omitempty"`
+	ExcludePorts []int `json:"excludePorts,omitempty"`
 }
 
 type GetFreePortsResponse struct {
@@ -78,9 +81,10 @@ type CountGeoDataRequest struct {
 }
 
 type PingBatchRequest struct {
-	Configs []PingBatchItemRequest `json:"configs,omitempty"`
-	Timeout int                    `json:"timeout,omitempty"`
-	URL     string                 `json:"url,omitempty"`
+	Configs     []PingBatchItemRequest `json:"configs,omitempty"`
+	Timeout     int                    `json:"timeout,omitempty"`
+	URL         string                 `json:"url,omitempty"`
+	LocationURL string                 `json:"locationUrl,omitempty"`
 }
 
 type PingBatchItemRequest struct {
@@ -93,9 +97,11 @@ type PingBatchResponse struct {
 }
 
 type PingBatchItemResponse struct {
-	Success bool   `json:"success"`
-	Delay   int64  `json:"delay,omitempty"`
-	Error   string `json:"error,omitempty"`
+	Success       bool    `json:"success"`
+	Delay         int64   `json:"delay"`
+	Error         string  `json:"error,omitempty"`
+	LocationJSON  *string `json:"locationJson,omitempty"`
+	LocationError string  `json:"locationError,omitempty"`
 }
 
 type RunXrayRequest struct {

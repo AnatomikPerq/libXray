@@ -65,9 +65,12 @@ type Operation struct {
 	// Outbound is one Xray outbound object for OpAddOutbound.
 	Outbound json.RawMessage `json:"outbound,omitempty"`
 	// Routing is an Xray `routing` object for OpAddRules; only its rules and
-	// balancers are applied.
+	// balancers are applied, never its domainStrategy.
 	Routing json.RawMessage `json:"routing,omitempty"`
-	// Append adds rules after the existing ones instead of before them.
+	// Append keeps the current rules and balancers and adds these after them.
+	// Without it Xray REPLACES every rule and balancer with the given ones in
+	// one step, so the routing must include the rule that keeps the control
+	// inbound on the api outbound.
 	Append bool `json:"append,omitempty"`
 }
 

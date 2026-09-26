@@ -268,7 +268,7 @@ that inbound:
     {"op": "removeRule", "tag": "app-minewire-bypass"},
     {"op": "removeOutbound", "tag": "proxy"},
     {"op": "addOutbound", "outbound": {"tag": "proxy", "protocol": "vless"}},
-    {"op": "addRules", "routing": {"rules": [...]}, "append": false}
+    {"op": "addRules", "routing": {"rules": [...], "balancers": [...]}}
   ]
 }
 ```
@@ -276,7 +276,11 @@ that inbound:
 `server` must be a loopback IP literal. Operations run in order and stop at the
 first failure; the error names the failing index so the caller can fall back to
 a full restart. Removing the default (first) outbound leaves Xray without one
-until the next `addOutbound`, which then becomes the default.
+until the next `addOutbound`, which then becomes the default. `addRules`
+without `append` REPLACES every rule and balancer in one step (Xray's
+`ReloadRules`); the new routing must therefore keep the rule that routes the
+control inbound to `api`. With `"append": true` the rules are added after the
+current ones. `domainStrategy` is never changed.
 
 ## minewire
 

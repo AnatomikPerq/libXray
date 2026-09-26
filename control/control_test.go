@@ -80,11 +80,23 @@ func TestApplySwapsOutboundAndRulesOnLiveCore(t *testing.T) {
 			{Op: OpRemoveRule, Tag: "bypass-old"},
 			{Op: OpRemoveOutbound, Tag: "proxy-old"},
 			{Op: OpAddOutbound, Outbound: json.RawMessage(`{"tag":"proxy-new","protocol":"freedom"}`)},
-			{Op: OpAddRules, Routing: json.RawMessage(`{"rules":[{"ruleTag":"bypass-new","ip":["203.0.113.2"],"outboundTag":"direct"}]}`)},
+			// A full replacement: it has to keep the control rule itself.
+			{Op: OpAddRules, Routing: json.RawMessage(`{"rules":[
+				{"inboundTag":["app-control"],"outboundTag":"api"},
+				{"ruleTag":"bypass-new","ip":["203.0.113.2"],"outboundTag":"direct"}]}`)},
 		},
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	// The API is still reachable after the rules were replaced.
+	if err := Apply(Request{
+		Server:     fmt.Sprintf("127.0.0.1:%d", port),
+		Username:   "app",
+		Password:   "secret",
+		Operations: []Operation{{Op: OpRemoveRule, Tag: "bypass-new"}},
+	}); err != nil {
+		t.Fatalf("API lost after replacing rules: %v", err)
 	}
 	if handler(instance, "proxy-old") != nil {
 		t.Fatal("old outbound is still registered")

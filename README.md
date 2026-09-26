@@ -71,14 +71,31 @@ resolve `latest` by default; set `LIBXRAY_GOMOBILE_VERSION` to select a Go modul
 version. Both `gomobile` and `gobind` use that resolved version.
 
 Linux and Windows builds also produce `bin/xray` or `bin/xray.exe`. This
-session Core protects Go DNS lookups from the VPN route and accepts only:
+session Core accepts only:
 
 ```shell
-xray run -dns <IP:port> -interface <name> -config <xray.json> [-error-file <path>]
+xray run [-dns <IP:port> -interface <name>] -config <xray.json>
+         [-config-sha256 <hex>] [-error-file <path>] [-stop-file <path>]
 ```
 
-The `-dns`, `-interface`, and `-config` options are required. `-dns` must be an IP endpoint, and `-config`
-points directly to the Xray JSON configuration.
+`-config` points directly to the Xray JSON configuration. `-dns` and
+`-interface` go together: in TUN mode they install a process-wide resolver
+bound to the physical interface, so the Core's own lookups cannot loop into
+the tunnel. A Core without a tunnel (system proxy mode) passes neither and
+follows normal OS routing. `-dns` must be an IP endpoint.
+
+The HYPER CLIENT fork hardens the Core for running elevated from files in a
+directory every process of the user can write:
+
+- `-config-sha256` makes the Core refuse a config whose SHA-256 differs; a
+  non-elevated process cannot change the arguments once UAC started the Core.
+- The `-error-file` and the log files named in the config are opened by the
+  Core first and refused if any part of their path is redirected (junction,
+  symlink). The handles stay open for the life of the process, which also
+  pins the paths against renames.
+- `-stop-file` stops the Core gracefully once the file appears, so the App can
+  end an elevated Core without another UAC prompt. The Core only checks the
+  file and never writes or deletes it.
 
 The optional `-error-file` also writes command failures to a UTF-8 file before
 exiting, preserving the same error printed to stderr. The file is cleared before
@@ -86,7 +103,8 @@ running; a successful run leaves it empty. Its parent directory must exist.
 Callers launching an elevated Core should create the file first under their own
 account so they retain read access. This is an error-return channel, not Xray's
 access/error log configuration, and it does not add a separate validation pass.
-Applications using this option must bundle a desktop Core built with its support.
+Applications using these options must bundle a desktop Core built with their
+support.
 
 > [!WARNING]
 > **Use only one Go runtime per process.** Go does not support loading multiple

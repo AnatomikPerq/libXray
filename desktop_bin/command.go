@@ -35,15 +35,21 @@ func parseRunOptions(args []string) (runOptions, error) {
 	if flags.NArg() != 0 {
 		return options, errors.New("unexpected positional arguments")
 	}
-	if options.dns == "" || options.interfaceName == "" || options.configPath == "" {
-		return options, errors.New("dns, interface, and config are required")
+	if options.configPath == "" {
+		return options, errors.New("config is required")
+	}
+	// TUN mode must pin the Core's own DNS to the physical interface, or its
+	// queries loop back into the tunnel. System proxy mode has no tunnel and
+	// follows normal OS routing, so it passes neither option.
+	if (options.dns == "") != (options.interfaceName == "") {
+		return options, errors.New("dns and interface must be given together")
 	}
 	return options, nil
 }
 
 func execute(args []string, run func(runOptions) error, stdout, stderr io.Writer) int {
 	usage := func() {
-		fmt.Fprintln(stdout, "Usage: xray run -dns <IP:port> -interface <name> -config <xray.json> [-error-file <path>]")
+		fmt.Fprintln(stdout, "Usage: xray run [-dns <IP:port> -interface <name>] -config <xray.json> [-error-file <path>]")
 	}
 	if len(args) == 1 && (args[0] == "-h" || args[0] == "--help") {
 		usage()

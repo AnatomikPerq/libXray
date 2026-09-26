@@ -237,7 +237,56 @@ runXray
 stopXray
 xrayVersion
 getXrayState
+controlXray
+startMinewire
+stopMinewire
+minewireState
 ```
+
+The last four methods belong to the HYPER CLIENT fork; see [control](#control)
+and [minewire](#minewire).
+
+## control
+
+`controlXray` changes a running desktop Core without restarting it, so a node
+switch does not cost another UAC prompt for the elevated TUN Core.
+
+Xray's gRPC API has no authentication, and whoever reaches it can add inbounds
+or reroute the traffic of an elevated process. The Core therefore never opens a
+raw API listener (`api.listen` stays empty). The App adds a loopback SOCKS5
+inbound with a random per-session password and routes that inbound tag to the
+`api` outbound as the first routing rule. `controlXray` dials the API through
+that inbound:
+
+```json
+{
+  "server": "127.0.0.1:43127",
+  "username": "app",
+  "password": "<random per session>",
+  "timeoutSeconds": 5,
+  "operations": [
+    {"op": "removeRule", "tag": "app-minewire-bypass"},
+    {"op": "removeOutbound", "tag": "proxy"},
+    {"op": "addOutbound", "outbound": {"tag": "proxy", "protocol": "vless"}},
+    {"op": "addRules", "routing": {"rules": [...]}, "append": false}
+  ]
+}
+```
+
+`server` must be a loopback IP literal. Operations run in order and stop at the
+first failure; the error names the failing index so the caller can fall back to
+a full restart. Removing the default (first) outbound leaves Xray without one
+until the next `addOutbound`, which then becomes the default.
+
+## minewire
+
+`startMinewire` (`serverAddress`, `password`, `mode`, optional `localPort`)
+starts the embedded [minewire](https://github.com/dmitrymodder/minewire-cli)
+engine and returns its loopback SOCKS5 port; Xray reaches it as an ordinary
+`socks` outbound. The engine accepts connections immediately but connects in
+the background: poll `minewireState` for `connected`. `stopMinewire` is
+idempotent. Pass an already resolved server address, because DNS may depend on
+the tunnel that is not up yet.
 
 ## controller
 

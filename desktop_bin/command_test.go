@@ -24,8 +24,20 @@ func TestParseRunOptions(t *testing.T) {
 		t.Fatalf("unexpected options: %#v", options)
 	}
 
-	if _, err := parseRunOptions([]string{"run", "-config", "xray.json"}); err == nil {
-		t.Fatal("missing DNS protection options were accepted")
+	// System proxy mode: no tunnel, so no DNS protection options at all.
+	options, err = parseRunOptions([]string{"run", "-config", "xray.json"})
+	if err != nil || options.dns != "" || options.interfaceName != "" {
+		t.Fatalf("proxy mode options: %#v, err=%v", options, err)
+	}
+
+	for _, args := range [][]string{
+		{"run", "-dns", "8.8.8.8:53", "-config", "xray.json"},
+		{"run", "-interface", "Ethernet", "-config", "xray.json"},
+		{"run", "-dns", "8.8.8.8:53", "-interface", "Ethernet"},
+	} {
+		if _, err := parseRunOptions(args); err == nil {
+			t.Fatalf("incomplete options were accepted: %v", args)
+		}
 	}
 }
 

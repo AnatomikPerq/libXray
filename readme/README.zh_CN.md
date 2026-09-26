@@ -173,7 +173,16 @@ runXray
 stopXray
 xrayVersion
 getXrayState
+controlXray
+startMinewire
+stopMinewire
+minewireState
 ```
+
+最后四个方法属于 HYPER CLIENT 分支，说明见英文 README 的 control 与 minewire 小节：
+`controlXray` 通过带随机会话密码的本机 SOCKS5 入站访问运行中 Core 的 API（不开放裸 API 监听），
+按顺序执行 removeOutbound / addOutbound / removeRule / addRules，首个失败即停止；`server` 必须是回环 IP。
+`startMinewire` 启动内嵌 minewire 引擎并返回本机 SOCKS5 端口，连接在后台建立，需轮询 `minewireState`。
 
 ## controller
 

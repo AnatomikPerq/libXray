@@ -24,6 +24,7 @@ const (
 	LibXrayMethodStartMinewire               LibXrayMethod = "startMinewire"
 	LibXrayMethodStopMinewire                LibXrayMethod = "stopMinewire"
 	LibXrayMethodMinewireState               LibXrayMethod = "minewireState"
+	LibXrayMethodControlXray                 LibXrayMethod = "controlXray"
 )
 
 type LibXrayInvokeRequest struct {

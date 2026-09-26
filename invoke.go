@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/xtls/libxray/control"
 	"github.com/xtls/libxray/geo"
 	"github.com/xtls/libxray/minewire"
 	"github.com/xtls/libxray/nodep"
@@ -70,6 +71,8 @@ func Invoke(requestJSON string) string {
 			LocalAddr: localAddr,
 			LastError: lastError,
 		}, nil)
+	case LibXrayMethodControlXray:
+		return invokeControlXray(request.Payload)
 	default:
 		return encodeInvokeResponse(nil, errors.New("unknown method"))
 	}
@@ -256,6 +259,16 @@ func invokeStartMinewire(payload json.RawMessage) string {
 		return encodeInvokeResponse(nil, err)
 	}
 	return encodeInvokeResponse(&StartMinewireResponse{LocalPort: port}, nil)
+}
+
+// invokeControlXray changes a running desktop Core through its authenticated
+// control inbound. See package control for why the API is never exposed raw.
+func invokeControlXray(payload json.RawMessage) string {
+	request, err := decodePayload[control.Request](payload)
+	if err != nil {
+		return encodeInvokeNoDataResponse(err)
+	}
+	return encodeInvokeNoDataResponse(control.Apply(request))
 }
 
 func invokeRunXray(payload json.RawMessage) string {

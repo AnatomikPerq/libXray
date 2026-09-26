@@ -62,15 +62,23 @@ func Invoke(requestJSON string) string {
 	case LibXrayMethodStartMinewire:
 		return invokeStartMinewire(request.Payload)
 	case LibXrayMethodStopMinewire:
-		return encodeInvokeNoDataResponse(minewire.Stop())
+		stop, err := decodePayload[StopMinewireRequest](request.Payload)
+		if err != nil {
+			return encodeInvokeNoDataResponse(err)
+		}
+		return encodeInvokeNoDataResponse(minewire.Stop(stop.LocalPort))
 	case LibXrayMethodMinewireState:
-		running, connected, localAddr, lastError := minewire.State()
-		return encodeInvokeResponse(&MinewireStateResponse{
-			Running:   running,
-			Connected: connected,
-			LocalAddr: localAddr,
-			LastError: lastError,
-		}, nil)
+		states := minewire.State()
+		response := &MinewireStateResponse{Engines: make([]MinewireEngineState, 0, len(states))}
+		for _, state := range states {
+			response.Engines = append(response.Engines, MinewireEngineState{
+				LocalPort: state.LocalPort,
+				Running:   state.Running,
+				Connected: state.Connected,
+				LastError: state.LastError,
+			})
+		}
+		return encodeInvokeResponse(response, nil)
 	case LibXrayMethodControlXray:
 		return invokeControlXray(request.Payload)
 	default:

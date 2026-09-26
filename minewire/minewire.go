@@ -10,8 +10,10 @@
 // Running in-process also keeps the password in memory instead of writing it
 // to a config file on disk.
 //
-// The engine still exposes a local SOCKS5 listener; Xray dials it as an
-// ordinary socks outbound. Only the process boundary is gone.
+// Each engine exposes a local SOCKS5 listener; Xray dials it as an ordinary
+// socks outbound. Several engines can run at once, keyed by that local port:
+// a balancer may hold more than one minewire node, and a node switch starts
+// the new engine before the old one is stopped.
 package minewire
 
 import (
@@ -24,9 +26,8 @@ import (
 )
 
 var (
-	mu     sync.Mutex
-	engine *core.Engine
-	local  string
+	mu      sync.Mutex
+	engines = map[int]*core.Engine{}
 )
 
 // StartOptions describes one minewire node.
@@ -38,14 +39,12 @@ type StartOptions struct {
 	Password      string
 	// Mode is "fast" or "realistic" and has to match the server.
 	Mode string
-	// LocalPort is optional. Zero means "pick a free one".
+	// LocalPort is optional. Zero means "pick a free one". An engine already
+	// on that port is replaced.
 	LocalPort int
 }
 
-// Start brings the tunnel up and returns the local SOCKS5 port.
-//
-// Any previous engine is stopped first: node parameters may have changed, and
-// restarting is cheaper to reason about than diffing configs.
+// Start brings one tunnel up and returns its local SOCKS5 port.
 func Start(options StartOptions) (int, error) {
 	if options.ServerAddress == "" || options.Password == "" {
 		return 0, errors.New("minewire: server address and password are required")
@@ -53,7 +52,6 @@ func Start(options StartOptions) (int, error) {
 
 	mu.Lock()
 	defer mu.Unlock()
-	stopLocked()
 
 	port := options.LocalPort
 	if port <= 0 {
@@ -62,6 +60,9 @@ func Start(options StartOptions) (int, error) {
 			return 0, err
 		}
 		port = free
+	} else if previous, ok := engines[port]; ok {
+		previous.Stop()
+		delete(engines, port)
 	}
 
 	mode := options.Mode
@@ -70,6 +71,7 @@ func Start(options StartOptions) (int, error) {
 	}
 
 	cfg := core.Config{
+		// Loopback only: the listener has no authentication of its own.
 		LocalPort:     fmt.Sprintf("127.0.0.1:%d", port),
 		ServerAddress: options.ServerAddress,
 		Password:      options.Password,
@@ -83,37 +85,51 @@ func Start(options StartOptions) (int, error) {
 	if err := next.Start(); err != nil {
 		return 0, err
 	}
-	engine = next
-	local = cfg.LocalPort
+	engines[port] = next
 	return port, nil
 }
 
-// Stop tears the tunnel down. Stopping an already stopped engine is fine.
-func Stop() error {
+// Stop tears down the engine on localPort, or every engine for 0. Stopping
+// an engine that is not running is fine.
+func Stop(localPort int) error {
 	mu.Lock()
 	defer mu.Unlock()
-	return stopLocked()
-}
-
-func stopLocked() error {
-	if engine == nil {
-		return nil
+	var result error
+	for port, engine := range engines {
+		if localPort != 0 && port != localPort {
+			continue
+		}
+		if err := engine.Stop(); err != nil && result == nil {
+			result = err
+		}
+		delete(engines, port)
 	}
-	err := engine.Stop()
-	engine = nil
-	local = ""
-	return err
+	return result
 }
 
-// State reports whether the tunnel is up and where it listens.
-func State() (running bool, connected bool, localAddr string, lastError string) {
+// EngineState reports one engine.
+type EngineState struct {
+	LocalPort int
+	Running   bool
+	Connected bool
+	LastError string
+}
+
+// State reports every running engine.
+func State() []EngineState {
 	mu.Lock()
 	defer mu.Unlock()
-	if engine == nil {
-		return false, false, "", ""
+	states := make([]EngineState, 0, len(engines))
+	for port, engine := range engines {
+		status := engine.Status()
+		states = append(states, EngineState{
+			LocalPort: port,
+			Running:   status.Running,
+			Connected: status.Connected,
+			LastError: status.LastError,
+		})
 	}
-	status := engine.Status()
-	return status.Running, status.Connected, local, status.LastError
+	return states
 }
 
 // freePort asks the OS for an unused loopback port and releases it again.

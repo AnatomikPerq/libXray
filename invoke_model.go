@@ -124,11 +124,20 @@ type StartMinewireResponse struct {
 	LocalPort int `json:"localPort"`
 }
 
-type MinewireStateResponse struct {
+// StopMinewireRequest stops the engine on LocalPort, or all of them for 0.
+type StopMinewireRequest struct {
+	LocalPort int `json:"localPort,omitempty"`
+}
+
+type MinewireEngineState struct {
+	LocalPort int    `json:"localPort"`
 	Running   bool   `json:"running"`
 	Connected bool   `json:"connected"`
-	LocalAddr string `json:"localAddr,omitempty"`
 	LastError string `json:"lastError,omitempty"`
+}
+
+type MinewireStateResponse struct {
+	Engines []MinewireEngineState `json:"engines"`
 }
 
 type TestXrayRequest struct {

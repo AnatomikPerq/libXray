@@ -42,6 +42,11 @@ type StartOptions struct {
 	// LocalPort is optional. Zero means "pick a free one". An engine already
 	// on that port is replaced.
 	LocalPort int
+	// Interface, when set, binds the connection to the server to that
+	// network interface. A desktop TUN captures the default route, and the
+	// engine runs in the App, outside the Core whose own dials are bound the
+	// same way; unbound, its uplink would loop through the tunnel.
+	Interface string
 }
 
 // Start brings one tunnel up and returns its local SOCKS5 port.
@@ -65,6 +70,15 @@ func Start(options StartOptions) (int, error) {
 		delete(engines, port)
 	}
 
+	next := core.NewEngine(engineConfig(options, port), core.NewLogger(core.LevelWarn))
+	if err := next.Start(); err != nil {
+		return 0, err
+	}
+	engines[port] = next
+	return port, nil
+}
+
+func engineConfig(options StartOptions, port int) core.Config {
 	mode := options.Mode
 	if mode != core.ModeRealistic {
 		mode = core.ModeFast
@@ -80,13 +94,13 @@ func Start(options StartOptions) (int, error) {
 		ProxyType: "socks5",
 		Mode:      mode,
 	}
-
-	next := core.NewEngine(cfg, core.NewLogger(core.LevelWarn))
-	if err := next.Start(); err != nil {
-		return 0, err
+	// The realistic mode's bandwidth defaults: left at zero, its throttle
+	// never refills and every upload write spins forever.
+	cfg.ApplyDefaults(nil)
+	if options.Interface != "" {
+		cfg.Dial = boundDialer(options.Interface)
 	}
-	engines[port] = next
-	return port, nil
+	return cfg
 }
 
 // Stop tears down the engine on localPort, or every engine for 0. Stopping

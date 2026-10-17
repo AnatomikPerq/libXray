@@ -302,16 +302,25 @@ current ones. `domainStrategy` is never changed.
 
 ## minewire
 
-`startMinewire` (`serverAddress`, `password`, `mode`, optional `localPort`)
-starts one embedded [minewire](https://github.com/dmitrymodder/minewire-cli)
-engine and returns its loopback SOCKS5 port; Xray reaches it as an ordinary
-`socks` outbound. Several engines may run at once, keyed by that port, so a
+`startMinewire` (`serverAddress`, `password`, `mode`, optional `localPort`
+and `interface`) starts one embedded
+[minewire](https://github.com/dmitrymodder/minewire-cli) engine and returns
+its loopback SOCKS5 port; Xray reaches it as an ordinary `socks` outbound.
+`interface` binds the engine's connection to the server to that network
+interface, as `sockopt.interface` does for Xray, so a desktop TUN does not
+capture it; if the interface is missing the engine dials unbound. The engine
+carries TCP only: SOCKS UDP is refused, so DNS through it must use TCP. Several engines may run at once, keyed by that port, so a
 balancer can hold more than one minewire node and a node switch can start the
 new engine before stopping the old one. An engine accepts connections
 immediately but connects in the background: poll `minewireState`, which lists
 every engine, for `connected`. `stopMinewire` takes an optional `localPort`
 (0 stops all) and is idempotent. Pass an already resolved server address,
 because DNS may depend on the tunnel that is not up yet.
+
+The engine is a patched copy of upstream's `src/core` in
+`third_party/minewire-cli`, wired in with a `replace` in `go.mod`; the wire
+protocol is unchanged. `third_party/minewire-cli/PATCHES.md` lists the
+changes.
 
 ## controller
 

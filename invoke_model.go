@@ -118,6 +118,8 @@ type StartMinewireRequest struct {
 	Password      string `json:"password,omitempty"`
 	Mode          string `json:"mode,omitempty"`
 	LocalPort     int    `json:"localPort,omitempty"`
+	// Interface binds the uplink to the physical interface (desktop TUN).
+	Interface string `json:"interface,omitempty"`
 }
 
 type StartMinewireResponse struct {

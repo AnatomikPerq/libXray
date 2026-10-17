@@ -70,3 +70,8 @@ require (
 	gvisor.dev/gvisor v0.0.0-20260122175437-89a5d21be8f0 // indirect
 	lukechampine.com/blake3 v1.4.1 // indirect
 )
+
+// The minewire engine with fixes for running inside a host app: whole
+// frames per write, an injectable dialer, no panics on malformed frames.
+// See third_party/minewire-cli/PATCHES.md.
+replace github.com/dmitrymodder/minewire-cli => ./third_party/minewire-cli

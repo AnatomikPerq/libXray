@@ -262,6 +262,7 @@ func invokeStartMinewire(payload json.RawMessage) string {
 		Password:      request.Password,
 		Mode:          request.Mode,
 		LocalPort:     request.LocalPort,
+		Interface:     request.Interface,
 	})
 	if err != nil {
 		return encodeInvokeResponse(nil, err)

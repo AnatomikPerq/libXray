@@ -1,6 +1,7 @@
 package minewire
 
 import (
+	"context"
 	"net"
 	"strconv"
 	"testing"
@@ -85,5 +86,48 @@ func TestListenerIsLoopbackOnly(t *testing.T) {
 			conn.Close()
 			t.Fatalf("engine reachable on %s", ip)
 		}
+	}
+}
+
+// A missing interface must not cost the connection: the bypass rule still
+// keeps the uplink out of the tunnel.
+func TestBoundDialerFallsBackWhenTheInterfaceIsGone(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	go func() {
+		if conn, err := listener.Accept(); err == nil {
+			conn.Close()
+		}
+	}()
+	dial := boundDialer("no such interface 7f3a")
+	conn, err := dial(context.Background(), "tcp", listener.Addr().String())
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	conn.Close()
+}
+
+// Without the defaults the realistic throttle has a zero rate and an upload
+// write never returns.
+func TestEngineConfig(t *testing.T) {
+	cfg := engineConfig(StartOptions{
+		ServerAddress: "127.0.0.1:1",
+		Password:      "secret",
+		Mode:          "realistic",
+	}, 1080)
+	if cfg.Mode != "realistic" || cfg.RealisticBandwidthKB <= 0 || cfg.RealisticBurstKB <= 0 {
+		t.Fatalf("realistic config: %+v", cfg)
+	}
+	if cfg.LocalPort != "127.0.0.1:1080" || cfg.ProxyType != "socks5" || cfg.Dial != nil {
+		t.Fatalf("listener config: %+v", cfg)
+	}
+	if engineConfig(StartOptions{Mode: "turbo"}, 1).Mode != "fast" {
+		t.Fatal("unknown mode is not fast")
+	}
+	if engineConfig(StartOptions{Interface: "Ethernet"}, 1).Dial == nil {
+		t.Fatal("interface without a bound dialer")
 	}
 }

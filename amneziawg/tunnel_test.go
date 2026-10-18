@@ -162,7 +162,7 @@ func roundTripUDP(target, message string) (string, error) {
 	return string(reply[:n]), err
 }
 
-// The keys of a real AmneziaWG 2.0 config, header protection included.
+// The keys of a real AmneziaWG 3.1 config, header protection included.
 const amneziaUAPI = "jc=6\njmin=10\njmax=50\ns1=12\ns2=12\ns3=12\ns4=12\n" +
 	"h1=1000-2000\nh2=3000-4000\nh3=5000-6000\nh4=7000-8000\n" +
 	"rekey_after_time=100-120\nrekey_timeout=3-7\nreject_after_time=150-180\n" +

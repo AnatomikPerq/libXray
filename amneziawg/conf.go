@@ -63,7 +63,7 @@ type PeerConfigJSON struct {
 }
 
 // Range is a number or a range "lo-hi" the engine picks from each time, as
-// AmneziaWG 2.0 writes headers, timings and keepalive. JSON takes a number or
+// AmneziaWG 2.0 and later write headers, timings and keepalive. JSON takes a number or
 // a string.
 type Range struct {
 	Lo, Hi uint32

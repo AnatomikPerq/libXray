@@ -1,5 +1,5 @@
 // Package amneziawg is the "amneziawg" outbound of Xray: Xray's WireGuard
-// client on amneziawg-go v3, so a node of AmneziaWG 2.0 (and of plain
+// client on amneziawg-go v3, so a node of AmneziaWG up to 3.1 (and of plain
 // WireGuard, which is AmneziaWG without its keys) is an ordinary outbound
 // of the Core with UDP, routing, balancers, stats and the live switch.
 //

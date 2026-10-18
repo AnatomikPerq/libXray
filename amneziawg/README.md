@@ -6,10 +6,12 @@ Xray's WireGuard client (`proxy/wireguard` of Xray-core, MPL-2.0) ported onto
 routing, balancers, observatory, stats, `controlXray` live switch, ping.
 Xray's own `"wireguard"` stays untouched for plain WireGuard and WARP.
 
-Only v3 of amneziawg-go knows the keys of current AmneziaWG 2.0 configs
-(S3/S4, ranges in H1-H4, header protection, timing ranges, random trailers,
-disabled cookies); 1.x and `master` do not. The keys of AmneziaWG 1.5 that v3
-dropped (J1-J3, Itime) are not accepted.
+It speaks AmneziaWG up to 3.1, the latest release: 2.0 brought S3/S4,
+ranges in H1-H4 and I1-I5, 3.0 header protection, content padding and
+timing ranges, 3.1 random trailers and disabled cookies. Only `v3.1.*` of
+amneziawg-go knows all of them: v3.0 lacks the 3.1 keys, 1.x and `master`
+everything of 3.x. Configs of 1.0 and 2.0 are read by the same engine; the
+keys of AmneziaWG 1.5 that v3 dropped (J1-J3, Itime) are not accepted.
 
 ## Settings
 

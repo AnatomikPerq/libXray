@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+// Regenerate config.pb.go with `go run .` in protogen/ (no protoc needed).
+package xray.libxray.amneziawg;
+option go_package = "github.com/xtls/libxray/amneziawg";
+
+// A peer of the device. Keys are hex, as the UAPI takes them.
+message PeerConfig {
+  string public_key = 1;
+  string pre_shared_key = 2;
+  string endpoint = 3;
+  // Persistent keepalive in seconds, or a range "lo-hi" the device picks from.
+  string keep_alive = 4;
+  repeated string allowed_ips = 5;
+}
+
+// One AmneziaWG device key in UAPI form, such as jc=4 or h1=100-200.
+// Built and checked by the JSON config, so new keys need no proto change.
+message Option {
+  string key = 1;
+  string value = 2;
+}
+
+message DeviceConfig {
+  string secret_key = 1;
+  // The addresses of this side inside the tunnel.
+  repeated string address = 2;
+  repeated PeerConfig peers = 3;
+  int32 mtu = 4;
+  // Resolvers inside the tunnel for domain targets.
+  repeated string dns = 5;
+  repeated Option options = 6;
+}

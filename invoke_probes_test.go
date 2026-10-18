@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -78,5 +79,42 @@ func TestInvokePingLocationAndZeroDelayWireFields(t *testing.T) {
 	response = invokeForTest(t, LibXrayMethodPingBatch, request)
 	if !response.Success || strings.Contains(string(response.Data), "location") {
 		t.Fatalf("latency-only response = %+v", response)
+	}
+}
+
+func TestInvokePingBatchUsesEachForcedOutboundAndOnlyLatencyHeads(t *testing.T) {
+	var heads, unexpected atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodHead {
+			heads.Add(1)
+		} else {
+			unexpected.Add(1)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+	request := PingBatchRequest{
+		Configs: []PingBatchItemRequest{
+			{XrayJson: `{"outbounds":[{"protocol":"freedom","tag":"proxy"}]}`},
+			{XrayJson: `{"outbounds":[{"protocol":"blackhole","tag":"proxy"}]}`},
+		},
+		Timeout: 1, URL: server.URL,
+	}
+	response := invokeForTest(t, LibXrayMethodPingBatch, request)
+	if !response.Success {
+		t.Fatalf("error = %s", response.Err)
+	}
+	results := decodeDataObject[PingBatchResponse](t, response).Results
+	if len(results) != 2 {
+		t.Fatalf("results = %d, want 2", len(results))
+	}
+	if !results[0].Success || results[0].Error != "" {
+		t.Fatalf("freedom result = %+v", results[0])
+	}
+	if results[1].Success || results[1].Error == "" {
+		t.Fatalf("blackhole outbound escaped through another client: %+v", results[1])
+	}
+	if heads.Load() != 1 || unexpected.Load() != 0 {
+		t.Fatalf("requests = HEAD %d, other %d", heads.Load(), unexpected.Load())
 	}
 }

@@ -40,7 +40,7 @@ Compile script. It is recommended to always use this script to compile libXray. 
 
 depends on git and go.
 
-By default, the build script does not clone [Xray-core](https://github.com/XTLS/Xray-core). It uses Go modules and pins Xray-core to release tag `v26.9.9` through its pseudo-version.
+By default, the build script does not clone [Xray-core](https://github.com/XTLS/Xray-core). It uses Go modules and pins Xray-core to release tag `v26.10.17` through its pseudo-version.
 Pass the optional `local` argument to use an existing local checkout at `../Xray-core` through a Go module `replace`.
 
 ### Usage
@@ -66,7 +66,19 @@ python3 build/main.py windows local
 
 ```
 
-Builds restore `go.mod` and `go.sum` on success or failure. Gomobile builds
+Builds snapshot and restore `go.mod` and `go.sum` on success or failure by default.
+Pass `--no-snapshot` to skip both the snapshot and restoration. Before initializing
+Go dependencies, the script deletes existing `go.mod` and `go.sum` and creates a
+fresh module. The resulting files are retained even if the build fails.
+This option is supported by every target
+and can be combined with `local` in either order:
+
+```shell
+python3 build/main.py android --no-snapshot
+python3 build/main.py apple go local --no-snapshot
+```
+
+Gomobile builds
 resolve `latest` by default; set `LIBXRAY_GOMOBILE_VERSION` to select a Go module
 version. Both `gomobile` and `gobind` use that resolved version.
 
@@ -240,11 +252,15 @@ Design notes:
    also serializes these operations with one another. Instances
    created outside the managed APIs are not detected or restored; callers
    requiring overlap with them must still use separate processes.
+8. `decodeSubscriptionText` returns the complete plaintext after optional Age
+   decryption. It does not parse subscription formats, project outbounds or
+   construct an Xray instance; callers own classification and validation.
 
 Supported methods:
 
 ```text
 getFreePorts
+decodeSubscriptionText
 convertShareLinksToXrayJson
 convertXrayJsonToShareLinks
 generateAgeKeyPair
@@ -486,9 +502,42 @@ container or a decryption failure returns `success: false` with `data: null`.
 Error text never includes rejected candidates or decrypted subscription text.
 Callers must not import/replace a subscription when no usable nodes remain.
 
+### decodeSubscriptionText
+
+Returns the complete subscription text, including full Xray JSON objects or
+arrays and their DNS, routing, balancers and unknown fields. This method only
+unwraps Age armor: unencrypted text, including URI lists and Base64 strings,
+is returned exactly as supplied. It does not validate JSON or decode Base64.
+
+```json
+{
+  "apiVersion": 3,
+  "method": "decodeSubscriptionText",
+  "payload": {
+    "text": "-----BEGIN AGE ENCRYPTED FILE-----\n...",
+    "age": {
+      "secretKey": "AGE-SECRET-KEY-1..."
+    }
+  }
+}
+```
+
+Success returns `data: {"text": "<complete plaintext>"}`; the `text` field is
+present even for empty text. Errors return `data: null` and the existing Age
+key, armor, decryption or plaintext-size error. Both unencrypted and decrypted
+plaintext are limited to 16 MiB of UTF-8 bytes. The complete Invoke request and
+encoded response retain their separate 16 MiB limits, so envelope or escaping
+overhead can reject text below the plaintext limit. The Go helper is
+`share.DecodeSubscriptionText(text, secretKey)`.
+
+The caller must classify the returned text before importing nodes or storing a
+complete configuration. This method does not create a temporary Core and can
+be called while a managed instance is running.
+
 ### age-encrypted subscriptions
 
-`convertShareLinksToXrayJson` accepts an optional native age secret key. Only
+`decodeSubscriptionText` and `convertShareLinksToXrayJson` accept an optional
+native age secret key. Only
 X25519 (`AGE-SECRET-KEY-1...`) and ML-KEM-768 + X25519 hybrid
 (`AGE-SECRET-KEY-PQ-1...`) identities are accepted. Recognized age armor is
 decrypted in memory and limited to 16 MiB of plaintext.
@@ -525,7 +574,8 @@ The response contains both `secretKey` and `publicKey`. The integrating
 application must persist the pair and send only `publicKey` as
 `X-Age-Public-Key`. libXray does not perform the subscription HTTP request,
 persist keys, or add headers. Applications must never send the secret key over
-HTTP or write decrypted subscription text to disk.
+HTTP or log secret keys or decrypted subscription text. Configuration
+persistence belongs to the integrating application.
 
 ### xray_json
 
@@ -588,6 +638,9 @@ provider must return HTTP 200 and at most 64 KiB; transport or body-read
 failures instead add `locationError`. Errors do not echo the URL, credentials
 or response body. Invalid outbound configs retain their ordinary per-item
 failure and do not perform either request.
+
+This fork keeps the `locationUrl` probe, which upstream removed: the App
+shows each node's flag from it.
 
 ### testXray
 

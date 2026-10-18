@@ -39,6 +39,8 @@ func Invoke(requestJSON string) string {
 	switch request.Method {
 	case LibXrayMethodGetFreePorts:
 		return invokeGetFreePorts(request.Payload)
+	case LibXrayMethodDecodeSubscriptionText:
+		return invokeDecodeSubscriptionText(request.Payload)
 	case LibXrayMethodConvertShareLinksToXrayJson:
 		return invokeConvertShareLinksToXrayJson(request.Payload)
 	case LibXrayMethodConvertXrayJsonToShareLinks:
@@ -152,6 +154,22 @@ func invokeGetFreePorts(payload json.RawMessage) string {
 		return encodeInvokeResponse(nil, err)
 	}
 	return encodeInvokeResponse(&GetFreePortsResponse{Ports: ports}, nil)
+}
+
+func invokeDecodeSubscriptionText(payload json.RawMessage) string {
+	request, err := decodePayload[DecodeSubscriptionTextRequest](payload)
+	if err != nil {
+		return encodeInvokeResponse(nil, err)
+	}
+	secretKey := ""
+	if request.Age != nil {
+		secretKey = request.Age.SecretKey
+	}
+	text, err := share.DecodeSubscriptionText(request.Text, secretKey)
+	if err != nil {
+		return encodeInvokeResponse(nil, err)
+	}
+	return encodeInvokeResponse(&DecodeSubscriptionTextResponse{Text: text}, nil)
 }
 
 func invokeConvertShareLinksToXrayJson(payload json.RawMessage) string {

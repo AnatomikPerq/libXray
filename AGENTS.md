@@ -23,9 +23,8 @@ changes need the relevant implementation and tests, not the entire API guide.
   managed-instance overlap before loading configuration and hold the lifecycle
   lock through worker completion and instance cleanup. Close temporary instances
   on every exit path; unmanaged overlaps require caller-owned process isolation.
-- When changing [batch probes](README.md#pingbatch), preserve input order,
-  per-item failure isolation, and raw `locationJson`; provider parsing belongs
-  to the App.
+- When changing [batch probes](README.md#pingbatch), preserve the five-item
+  limit, input order, per-item failure isolation, and delay-only results.
 - Traffic comes directly from [Xray metrics](README.md#metrics). The library
   manages the Core lifecycle only; it does not sample or persist traffic.
 - When changing [age subscriptions](README.md#age-encrypted-subscriptions),
@@ -44,7 +43,8 @@ and the relevant platform/controller section in README.
   process resolver and `ResetDNS` follows managed-instance shutdown.
 - Use `build/main.py` to generate native artifacts; do not edit generated
   headers, archives, or binaries. Verify temporary module edits are restored
-  after a build and check the build command's success and resulting artifacts.
+  after a build by default, or retained when `--no-snapshot` is explicitly used.
+  Check the build command's success and resulting artifacts.
 - Modify an adjacent Xray-core checkout only when explicitly requested.
 
 Targets and local-core options are documented in [build usage](README.md#usage).

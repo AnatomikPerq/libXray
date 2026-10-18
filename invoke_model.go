@@ -11,6 +11,7 @@ const LibXrayAPIVersion = 3
 
 const (
 	LibXrayMethodGetFreePorts                LibXrayMethod = "getFreePorts"
+	LibXrayMethodDecodeSubscriptionText      LibXrayMethod = "decodeSubscriptionText"
 	LibXrayMethodConvertShareLinksToXrayJson LibXrayMethod = "convertShareLinksToXrayJson"
 	LibXrayMethodConvertXrayJsonToShareLinks LibXrayMethod = "convertXrayJsonToShareLinks"
 	LibXrayMethodGenerateAgeKeyPair          LibXrayMethod = "generateAgeKeyPair"
@@ -44,6 +45,15 @@ type GetFreePortsResponse struct {
 
 type AgeDecryptConfig struct {
 	SecretKey string `json:"secretKey,omitempty"`
+}
+
+type DecodeSubscriptionTextRequest struct {
+	Text string            `json:"text,omitempty"`
+	Age  *AgeDecryptConfig `json:"age,omitempty"`
+}
+
+type DecodeSubscriptionTextResponse struct {
+	Text string `json:"text"`
 }
 
 type ConvertShareLinksToXrayJsonRequest struct {

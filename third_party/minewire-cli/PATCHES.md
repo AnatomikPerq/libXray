@@ -20,7 +20,12 @@ Changes, each marked `libXray patch` in the code:
 - `tunnel.go`: uses `Config.Dial` under the engine's context, so `Stop`
   aborts a pending dial; the reader loop recovers from a panic on a malformed
   frame instead of taking down the host process; a dropped session is
-  redialed at once instead of on the next 3 s poll.
+  redialed at once instead of on the next 3 s poll; `Config.LogWriter`
+  replaces stderr as yamux's log output (a GUI host has no stderr).
+- `engine.go`: `Status().Connected` is false once the session is closed.
+  Upstream cleared the flag only on the next successful login, so an engine
+  whose redials kept failing reported itself connected.
+- `engine_status_test.go`: covers the `Connected` change.
 
 To update: copy upstream's `src/core` over this one and re-apply the marked
 changes.

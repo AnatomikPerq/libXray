@@ -2,9 +2,14 @@ package minewire
 
 import (
 	"context"
+	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
+	"time"
 )
 
 // The server is unreachable on purpose: engines listen at once and connect in
@@ -129,5 +134,56 @@ func TestEngineConfig(t *testing.T) {
 	}
 	if engineConfig(StartOptions{Interface: "Ethernet"}, 1).Dial == nil {
 		t.Fatal("interface without a bound dialer")
+	}
+}
+
+func TestEngineWritesItsLogFile(t *testing.T) {
+	t.Cleanup(func() { Stop(0) })
+	path := filepath.Join(t.TempDir(), "minewire.log")
+	port, err := Start(StartOptions{
+		ServerAddress: "127.0.0.1:1",
+		Password:      "secret",
+		Mode:          "fast",
+		LogFile:       path,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := fmt.Sprintf("engine %d: connect failed", port)
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		data, _ := os.ReadFile(path)
+		if strings.Contains(string(data), want) {
+			if strings.Contains(string(data), "secret") {
+				t.Fatalf("the password leaked into the log:\n%s", data)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("log has no %q:\n%s", want, data)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	for _, state := range State() {
+		if state.LocalPort == port && (state.Connected || state.LastError == "") {
+			t.Fatalf("an unreachable server reports %+v", state)
+		}
+	}
+}
+
+func TestLogFileRotates(t *testing.T) {
+	previous := maxLogBytes
+	maxLogBytes = 64
+	t.Cleanup(func() { maxLogBytes = previous })
+	path := filepath.Join(t.TempDir(), "minewire.log")
+	log := &logFile{path: path}
+	line := []byte(strings.Repeat("x", 40) + "\n")
+	for i := 0; i < 3; i++ {
+		log.Write(line)
+	}
+	current, _ := os.ReadFile(path)
+	rotated, _ := os.ReadFile(path + ".1")
+	if len(current) != len(line) || len(rotated) != len(line) {
+		t.Fatalf("current %d bytes, rotated %d bytes", len(current), len(rotated))
 	}
 }

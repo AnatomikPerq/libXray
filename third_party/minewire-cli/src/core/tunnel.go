@@ -187,6 +187,10 @@ func (e *Engine) connectToServer() (*yamux.Session, error) {
 	conf.ConnectionWriteTimeout = 15 * time.Second
 	conf.MaxStreamWindowSize = 16 * 1024 * 1024
 	conf.StreamOpenTimeout = 30 * time.Second
+	// libXray patch: yamux logs to the host's writer instead of stderr.
+	if e.cfg.LogWriter != nil {
+		conf.LogOutput = e.cfg.LogWriter
+	}
 	return yamux.Client(mc, conf)
 }
 

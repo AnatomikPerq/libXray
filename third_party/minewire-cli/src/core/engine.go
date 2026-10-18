@@ -149,9 +149,12 @@ func (e *Engine) Stop() error {
 func (e *Engine) Status() Status {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	// libXray patch: a session that dropped while every redial fails is not
+	// connected; the flag alone stayed true until the next successful login.
+	connected := e.connected && e.session != nil && !e.session.IsClosed()
 	return Status{
 		Running:       e.running,
-		Connected:     e.connected,
+		Connected:     connected,
 		Mode:          e.cfg.Mode,
 		ProxyType:     e.cfg.ProxyType,
 		LocalAddr:     e.cfg.LocalPort,

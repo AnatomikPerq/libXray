@@ -130,6 +130,8 @@ type StartMinewireRequest struct {
 	LocalPort     int    `json:"localPort,omitempty"`
 	// Interface binds the uplink to the physical interface (desktop TUN).
 	Interface string `json:"interface,omitempty"`
+	// LogFile is the engine's diagnostics file, empty for none.
+	LogFile string `json:"logFile,omitempty"`
 }
 
 type StartMinewireResponse struct {

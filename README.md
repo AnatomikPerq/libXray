@@ -318,8 +318,8 @@ current ones. `domainStrategy` is never changed.
 
 ## minewire
 
-`startMinewire` (`serverAddress`, `password`, `mode`, optional `localPort`
-and `interface`) starts one embedded
+`startMinewire` (`serverAddress`, `password`, `mode`, optional `localPort`,
+`interface` and `logFile`) starts one embedded
 [minewire](https://github.com/dmitrymodder/minewire-cli) engine and returns
 its loopback SOCKS5 port; Xray reaches it as an ordinary `socks` outbound.
 `interface` binds the engine's connection to the server to that network
@@ -331,7 +331,11 @@ new engine before stopping the old one. An engine accepts connections
 immediately but connects in the background: poll `minewireState`, which lists
 every engine, for `connected`. `stopMinewire` takes an optional `localPort`
 (0 stops all) and is idempotent. Pass an already resolved server address,
-because DNS may depend on the tunnel that is not up yet.
+because DNS may depend on the tunnel that is not up yet. Optional `logFile`
+appends the engine's logins, drops and errors (and yamux's keepalive
+failures) to that file, each line tagged with the engine's port, rotating it
+to `<logFile>.1` at 1 MiB. `connected` in `minewireState` turns false as soon
+as the session drops, not only after the next successful login.
 
 The engine is a patched copy of upstream's `src/core` in
 `third_party/minewire-cli`, wired in with a `replace` in `go.mod`; the wire

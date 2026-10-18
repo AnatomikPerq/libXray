@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"io"
 	"net"
 	"os"
 
@@ -37,6 +38,11 @@ type Config struct {
 	// to the physical interface while a TUN captures the default route.
 	// Not part of the file or IPC config (libXray patch).
 	Dial func(ctx context.Context, network, address string) (net.Conn, error) `yaml:"-" json:"-"`
+
+	// LogWriter, when set, receives yamux's own messages (keepalive
+	// failures, stream errors), which otherwise go to stderr. A GUI host
+	// has no stderr. Not part of the file or IPC config (libXray patch).
+	LogWriter io.Writer `yaml:"-" json:"-"`
 }
 
 // LoadConfigFile reads and validates a client.yaml-shaped file, applying

@@ -47,6 +47,10 @@ type StartOptions struct {
 	// engine runs in the App, outside the Core whose own dials are bound the
 	// same way; unbound, its uplink would loop through the tunnel.
 	Interface string
+	// LogFile, when set, receives the engine's connects, drops and errors,
+	// and yamux's keepalive failures, rotated at 1 MiB. Throwaway ping
+	// engines leave it empty.
+	LogFile string
 }
 
 // Start brings one tunnel up and returns its local SOCKS5 port.
@@ -70,7 +74,17 @@ func Start(options StartOptions) (int, error) {
 		delete(engines, port)
 	}
 
-	next := core.NewEngine(engineConfig(options, port), core.NewLogger(core.LevelWarn))
+	cfg := engineConfig(options, port)
+	logger := core.NewLogger(core.LevelWarn)
+	if options.LogFile != "" {
+		log := engineLog{file: sharedLog(options.LogFile), port: port}
+		// Info adds the start, login and stop lines: a drop shows up as the
+		// gap between two logins.
+		logger.SetLevel(core.LevelInfo)
+		logger.SetSink(log.line)
+		cfg.LogWriter = log
+	}
+	next := core.NewEngine(cfg, logger)
 	if err := next.Start(); err != nil {
 		return 0, err
 	}

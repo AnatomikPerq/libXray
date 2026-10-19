@@ -4,13 +4,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/xtls/xray-core/common/geodata"
+	"github.com/xtls/xray-core/common/platform"
 	"github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/features/outbound"
 	"github.com/xtls/xray-core/infra/conf/serial"
 	_ "github.com/xtls/xray-core/main/distro/all"
+	"google.golang.org/protobuf/proto"
 )
 
 func freePort(t *testing.T) int {
@@ -186,5 +191,74 @@ func TestValidateRejectsUnsafeRequests(t *testing.T) {
 	}
 	if err := validate(base); err != nil {
 		t.Fatalf("valid request rejected: %v", err)
+	}
+}
+
+// geoAssetDir writes a geosite.dat with one TEST list, the way the App's dat
+// directory holds the real one.
+func geoAssetDir(t *testing.T) string {
+	t.Helper()
+	list := &geodata.GeoSiteList{Entry: []*geodata.GeoSite{{
+		Code:   "TEST",
+		Domain: []*geodata.Domain{{Type: geodata.Domain_Full, Value: "example.com"}},
+	}}}
+	bytes, err := proto.Marshal(list)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "geosite.dat"), bytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func TestApplyBuildsGeoRulesFromAssetDir(t *testing.T) {
+	// The App process has no asset location of its own.
+	t.Setenv(platform.AssetLocation, "")
+	port := freePort(t)
+	instance := startCore(t, port, "secret")
+	request := Request{
+		Server:   fmt.Sprintf("127.0.0.1:%d", port),
+		Username: "app",
+		Password: "secret",
+		Operations: []Operation{
+			{Op: OpRemoveOutbound, Tag: "proxy-old"},
+			{Op: OpAddOutbound, Outbound: json.RawMessage(`{"tag":"proxy-new","protocol":"freedom"}`)},
+			{Op: OpAddRules, Routing: json.RawMessage(`{"rules":[
+				{"inboundTag":["app-control"],"outboundTag":"api"},
+				{"domain":["geosite:TEST"],"outboundTag":"direct"}]}`)},
+		},
+	}
+
+	err := Apply(request)
+	var controlErr *Error
+	if err == nil || !asControlError(err, &controlErr) || controlErr.Index != 2 || controlErr.Built {
+		t.Fatalf("err = %v, want operation 2 failing to build without the asset dir", err)
+	}
+	// Nothing was sent: a request that cannot be built leaves the Core as it was.
+	if handler(instance, "proxy-old") == nil || handler(instance, "proxy-new") != nil {
+		t.Fatal("the Core changed although the request could not be built")
+	}
+
+	request.AssetDir = geoAssetDir(t)
+	if err := Apply(request); err != nil {
+		t.Fatalf("geosite rule with asset dir: %v", err)
+	}
+	if handler(instance, "proxy-new") == nil {
+		t.Fatal("new outbound was not added")
+	}
+}
+
+func TestValidateRejectsRelativeAssetDir(t *testing.T) {
+	err := validate(Request{
+		Server:     "127.0.0.1:1",
+		Username:   "app",
+		Password:   "secret",
+		Operations: []Operation{{Op: OpRemoveRule, Tag: "x"}},
+		AssetDir:   "dat",
+	})
+	if err == nil {
+		t.Fatal("relative asset dir accepted")
 	}
 }

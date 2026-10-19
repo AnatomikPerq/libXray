@@ -19,12 +19,16 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	handlerService "github.com/xtls/xray-core/app/proxyman/command"
 	routerService "github.com/xtls/xray-core/app/router/command"
+	"github.com/xtls/xray-core/common/platform"
 	cserial "github.com/xtls/xray-core/common/serial"
+	"github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/infra/conf"
 	"golang.org/x/net/proxy"
 	"google.golang.org/grpc"
@@ -55,6 +59,11 @@ type Request struct {
 	Password       string      `json:"password"`
 	TimeoutSeconds int         `json:"timeoutSeconds,omitempty"`
 	Operations     []Operation `json:"operations"`
+	// AssetDir holds geosite.dat and geoip.dat. Outbounds and rules are built
+	// here, in the App's process, which unlike the Core has no
+	// `xray.location.asset` in its environment: without it every `geosite:`
+	// and `geoip:` rule is looked up next to the App's executable and fails.
+	AssetDir string `json:"assetDir,omitempty"`
 }
 
 // Operation is one API call.
@@ -75,23 +84,52 @@ type Operation struct {
 }
 
 // Error reports which operation failed, so the caller knows how far the live
-// Core got before deciding how to recover.
+// Core got before deciding how to recover. Every operation is built before
+// the first call, so a failure with Built false left the Core untouched.
 type Error struct {
 	Index int
 	Op    string
 	Err   error
+	Built bool
 }
 
 func (e *Error) Error() string {
+	if !e.Built {
+		return fmt.Sprintf("control operation %d (%s) not built, Core unchanged: %v", e.Index, e.Op, e.Err)
+	}
 	return fmt.Sprintf("control operation %d (%s): %v", e.Index, e.Op, e.Err)
 }
 
 func (e *Error) Unwrap() error { return e.Err }
 
-// Apply runs every operation in order and stops at the first failure.
+// built is an Operation ready to send: outbounds and routing turned into
+// the protobuf messages the API takes.
+type built struct {
+	Operation
+	outbound *core.OutboundHandlerConfig
+	routing  *cserial.TypedMessage
+}
+
+// Apply builds every operation, then runs them in order and stops at the
+// first failure.
 func Apply(request Request) error {
 	if err := validate(request); err != nil {
 		return err
+	}
+	if request.AssetDir != "" {
+		// Read by Xray on every lookup, so setting it here is enough; the
+		// Core itself gets the same directory from its config's env.
+		if err := os.Setenv(platform.AssetLocation, request.AssetDir); err != nil {
+			return fmt.Errorf("control asset dir: %w", err)
+		}
+	}
+	operations := make([]built, 0, len(request.Operations))
+	for index, operation := range request.Operations {
+		next, err := build(operation)
+		if err != nil {
+			return &Error{Index: index, Op: operation.Op, Err: err}
+		}
+		operations = append(operations, next)
 	}
 	timeout := defaultTimeout
 	if request.TimeoutSeconds > 0 {
@@ -111,9 +149,9 @@ func Apply(request Request) error {
 
 	handlers := handlerService.NewHandlerServiceClient(conn)
 	router := routerService.NewRoutingServiceClient(conn)
-	for index, operation := range request.Operations {
+	for index, operation := range operations {
 		if err := apply(ctx, handlers, router, operation); err != nil {
-			return &Error{Index: index, Op: operation.Op, Err: err}
+			return &Error{Index: index, Op: operation.Op, Err: err, Built: true}
 		}
 	}
 	return nil
@@ -136,6 +174,9 @@ func validate(request Request) error {
 	}
 	if len(request.Operations) == 0 {
 		return errors.New("no control operations")
+	}
+	if request.AssetDir != "" && !filepath.IsAbs(request.AssetDir) {
+		return errors.New("control asset dir must be an absolute path")
 	}
 	for index, operation := range request.Operations {
 		switch operation.Op {
@@ -179,41 +220,54 @@ func dial(request Request) (*grpc.ClientConn, error) {
 	)
 }
 
+// build parses and builds an operation's outbound or routing without
+// touching the Core.
+func build(operation Operation) (built, error) {
+	next := built{Operation: operation}
+	switch operation.Op {
+	case OpAddOutbound:
+		var detour conf.OutboundDetourConfig
+		if err := json.Unmarshal(operation.Outbound, &detour); err != nil {
+			return next, err
+		}
+		outbound, err := detour.Build()
+		if err != nil {
+			return next, err
+		}
+		next.outbound = outbound
+	case OpAddRules:
+		var routing conf.RouterConfig
+		if err := json.Unmarshal(operation.Routing, &routing); err != nil {
+			return next, err
+		}
+		config, err := routing.Build()
+		if err != nil {
+			return next, err
+		}
+		next.routing = cserial.ToTypedMessage(config)
+	}
+	return next, nil
+}
+
 func apply(
 	ctx context.Context,
 	handlers handlerService.HandlerServiceClient,
 	router routerService.RoutingServiceClient,
-	operation Operation,
+	operation built,
 ) error {
 	switch operation.Op {
 	case OpRemoveOutbound:
 		_, err := handlers.RemoveOutbound(ctx, &handlerService.RemoveOutboundRequest{Tag: operation.Tag})
 		return err
 	case OpAddOutbound:
-		var detour conf.OutboundDetourConfig
-		if err := json.Unmarshal(operation.Outbound, &detour); err != nil {
-			return err
-		}
-		outbound, err := detour.Build()
-		if err != nil {
-			return err
-		}
-		_, err = handlers.AddOutbound(ctx, &handlerService.AddOutboundRequest{Outbound: outbound})
+		_, err := handlers.AddOutbound(ctx, &handlerService.AddOutboundRequest{Outbound: operation.outbound})
 		return err
 	case OpRemoveRule:
 		_, err := router.RemoveRule(ctx, &routerService.RemoveRuleRequest{RuleTag: operation.Tag})
 		return err
 	case OpAddRules:
-		var routing conf.RouterConfig
-		if err := json.Unmarshal(operation.Routing, &routing); err != nil {
-			return err
-		}
-		config, err := routing.Build()
-		if err != nil {
-			return err
-		}
-		_, err = router.AddRule(ctx, &routerService.AddRuleRequest{
-			Config:       cserial.ToTypedMessage(config),
+		_, err := router.AddRule(ctx, &routerService.AddRuleRequest{
+			Config:       operation.routing,
 			ShouldAppend: operation.Append,
 		})
 		return err

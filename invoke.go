@@ -7,6 +7,7 @@ import (
 
 	"github.com/xtls/libxray/control"
 	"github.com/xtls/libxray/geo"
+	"github.com/xtls/libxray/killswitch"
 	"github.com/xtls/libxray/minewire"
 	"github.com/xtls/libxray/nodep"
 	"github.com/xtls/libxray/share"
@@ -83,6 +84,16 @@ func Invoke(requestJSON string) string {
 		return encodeInvokeResponse(response, nil)
 	case LibXrayMethodControlXray:
 		return invokeControlXray(request.Payload)
+	case LibXrayMethodKillSwitchState:
+		engaged, err := killswitch.Engaged()
+		if err != nil {
+			return encodeInvokeResponse(nil, err)
+		}
+		return encodeInvokeResponse(&KillSwitchStateResponse{Engaged: engaged, Session: killswitch.CurrentSession()}, nil)
+	case LibXrayMethodLiftKillSwitch:
+		return encodeInvokeNoDataResponse(killswitch.Lift())
+	case LibXrayMethodResolveHost:
+		return invokeResolveHost(request.Payload)
 	default:
 		return encodeInvokeResponse(nil, errors.New("unknown method"))
 	}

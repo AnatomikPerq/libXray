@@ -275,10 +275,13 @@ controlXray
 startMinewire
 stopMinewire
 minewireState
+killSwitchState
+liftKillSwitch
+resolveHost
 ```
 
-The last four methods belong to the HYPER CLIENT fork; see [control](#control)
-and [minewire](#minewire).
+The last seven methods belong to the HYPER CLIENT fork; see [control](#control),
+[minewire](#minewire) and [kill switch](#kill-switch).
 
 ## control
 
@@ -341,6 +344,39 @@ The engine is a patched copy of upstream's `src/core` in
 `third_party/minewire-cli`, wired in with a `replace` in `go.mod`; the wire
 protocol is unchanged. `third_party/minewire-cli/PATCHES.md` lists the
 changes.
+
+## kill switch
+
+The desktop TUN Core takes `-kill-switch` (with optional `-kill-switch-lan`,
+`-kill-switch-app <path>` and `-kill-switch-persistent`). Before Xray starts it
+installs Windows Filtering Platform filters that block every connection in
+and out, both IP versions, except: the Core and the `-kill-switch-app`
+executable, loopback, DHCP and IPv6 neighbor discovery, the TUN adapter once
+Xray has created it, and with `-kill-switch-lan` private, link-local and
+multicast networks (DNS to them stays blocked). The filters live in a WFP
+session that is not dynamic, so they outlive the Core: a Core that crashes
+leaves the machine blocked instead of leaking. `-kill-switch-persistent` also
+keeps them across a reboot. Package `killswitch` holds the filters; the plan
+is plain data and tested without WFP.
+
+They are removed only on purpose. The App's stop file decides: empty (a
+disconnect) lifts them, `restart` (another Core follows) keeps them, and a
+signal keeps them too. The filters grant the user who ran the Core read and
+delete rights, so the unelevated App calls `killSwitchState` (`{"engaged":
+bool}`) and `liftKillSwitch` itself, without another UAC prompt.
+`HyperClientCore unblock`, run elevated, is the fallback when the App's user
+may not (an administrator elevated the Core with other credentials). Other
+platforms report `engaged: false`, lift nothing, and refuse `-kill-switch`.
+`killSwitchState` also returns `session` (`bootedAt` in Unix milliseconds and
+`logon`), so the App can tell a block left in this session from one left
+before the user logged off: Windows' fast startup keeps the boot time across a
+shutdown, not the logon.
+
+`resolveHost` (`host`, optional `timeoutSeconds`) resolves a name with Go's own
+resolver, IPv4 first. The queries leave from the calling process; the system
+resolver would hand them to Windows' DNS Client service, which the kill switch
+blocks outside the tunnel, so the App could not resolve a minewire server while
+it reconnects.
 
 ## controller
 

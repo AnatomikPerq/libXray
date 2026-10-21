@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"os/signal"
 	"syscall"
@@ -22,6 +23,21 @@ func run(options runOptions) error {
 		return err
 	}
 	defer closeAll(logs)
+	// Engaged before anything else, and left in place on every error: the App
+	// decides whether a failed start keeps the block (a reconnect) or lifts it
+	// (a first connect).
+	var guard *killSwitchGuard
+	if options.killSwitch {
+		if guard, err = engageKillSwitch(options, config); err != nil {
+			return err
+		}
+		// Unless asked to survive a reboot, the block ends with the session:
+		// fast startup would otherwise carry it over a shutdown. Without the
+		// watch the App still lifts it once it sees the new session.
+		if !options.killSwitchPersistent {
+			_ = watchSessionEnd(func() { _ = liftKillSwitch() })
+		}
+	}
 	if options.interfaceName != "" {
 		if err := dns.SetDNS(options.dns, options.interfaceName); err != nil {
 			return err
@@ -32,22 +48,52 @@ func run(options runOptions) error {
 	if err := xray.RunXray(string(config)); err != nil {
 		return err
 	}
+	if guard != nil {
+		if err := guard.admitTunnel(); err != nil {
+			xray.StopXray()
+			return err
+		}
+	}
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
 	defer signal.Stop(signals)
+	reason := stopSignal
 	select {
 	case <-signals:
-	case <-stopRequested(options.stopFile):
+	case reason = <-stopRequested(options.stopFile):
 	}
-	return xray.StopXray()
+	err = xray.StopXray()
+	if guard != nil && reason == stopDisconnect {
+		if liftErr := liftKillSwitch(); err == nil {
+			err = liftErr
+		}
+	}
+	return err
 }
 
+type stopReason int
+
+const (
+	// stopSignal: interrupted, or the session ends. The user did not
+	// disconnect, so the kill switch stays.
+	stopSignal stopReason = iota
+	// stopDisconnect: the App disconnects; the kill switch is lifted.
+	stopDisconnect
+	// stopRestart: the App replaces this Core with another one; the kill
+	// switch stays, so nothing slips out in between.
+	stopRestart
+)
+
+// restartRequest is what the App writes into the stop file when another Core
+// follows. An empty file, as older Apps create it, means a disconnect.
+var restartRequest = []byte("restart")
+
 // stopRequested fires once the stop file exists. The App uses it to end an
-// elevated Core without a second UAC prompt; the Core only checks for the
-// file and never writes or deletes it.
-func stopRequested(path string) <-chan struct{} {
-	done := make(chan struct{})
+// elevated Core without a second UAC prompt; the Core only reads the file and
+// never writes or deletes it.
+func stopRequested(path string) <-chan stopReason {
+	done := make(chan stopReason, 1)
 	if path == "" {
 		return done
 	}
@@ -55,13 +101,21 @@ func stopRequested(path string) <-chan struct{} {
 		ticker := time.NewTicker(250 * time.Millisecond)
 		defer ticker.Stop()
 		for range ticker.C {
-			if _, err := os.Stat(path); err == nil {
-				close(done)
+			content, err := os.ReadFile(path)
+			if err == nil || !os.IsNotExist(err) {
+				done <- readStopReason(content)
 				return
 			}
 		}
 	}()
 	return done
+}
+
+func readStopReason(content []byte) stopReason {
+	if bytes.Equal(bytes.TrimSpace(content), restartRequest) {
+		return stopRestart
+	}
+	return stopDisconnect
 }
 
 func main() {

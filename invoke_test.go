@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"runtime"
 	"testing"
 
 	"github.com/metacubex/age"
@@ -856,5 +857,46 @@ func xrayStopForTest(t *testing.T) {
 	response := invokeForTest(t, LibXrayMethodStopXray, nil)
 	if !response.Success {
 		t.Fatalf("StopXray failed: %s", response.Err)
+	}
+}
+
+// Nothing in the test engages the kill switch, so it reads as not engaged and
+// lifting it is a no-op; both work without administrator rights.
+func TestInvokeKillSwitchStateAndLift(t *testing.T) {
+	response := invokeForTest(t, LibXrayMethodKillSwitchState, nil)
+	if !response.Success {
+		t.Fatalf("killSwitchState failed: %s", response.Err)
+	}
+	var state KillSwitchStateResponse
+	if err := json.Unmarshal(response.Data, &state); err != nil {
+		t.Fatal(err)
+	}
+	if state.Engaged {
+		t.Skip("a kill switch is engaged on this machine; not touching it")
+	}
+	if runtime.GOOS == "windows" && (state.Session.BootedAt <= 0 || state.Session.Logon == "") {
+		t.Fatalf("session is incomplete: %+v", state.Session)
+	}
+	response = invokeForTest(t, LibXrayMethodLiftKillSwitch, nil)
+	if !response.Success {
+		t.Fatalf("liftKillSwitch failed: %s", response.Err)
+	}
+}
+
+func TestInvokeResolveHost(t *testing.T) {
+	response := invokeForTest(t, LibXrayMethodResolveHost, ResolveHostRequest{Host: "::ffff:192.0.2.1"})
+	if !response.Success {
+		t.Fatalf("resolveHost failed: %s", response.Err)
+	}
+	var resolved ResolveHostResponse
+	if err := json.Unmarshal(response.Data, &resolved); err != nil {
+		t.Fatal(err)
+	}
+	if len(resolved.Addresses) != 1 || resolved.Addresses[0] != "192.0.2.1" {
+		t.Fatalf("literal: %v", resolved.Addresses)
+	}
+
+	if response = invokeForTest(t, LibXrayMethodResolveHost, ResolveHostRequest{}); response.Success {
+		t.Fatal("an empty host was accepted")
 	}
 }

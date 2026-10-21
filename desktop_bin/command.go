@@ -17,6 +17,11 @@ type runOptions struct {
 	errorFile     string
 	stopFile      string
 	configSHA256  string
+
+	killSwitch           bool
+	killSwitchLAN        bool
+	killSwitchApp        string
+	killSwitchPersistent bool
 }
 
 func parseRunOptions(args []string) (runOptions, error) {
@@ -33,6 +38,10 @@ func parseRunOptions(args []string) (runOptions, error) {
 	flags.StringVar(&options.errorFile, "error-file", "", "also write command errors to this file")
 	flags.StringVar(&options.stopFile, "stop-file", "", "stop gracefully once this file appears")
 	flags.StringVar(&options.configSHA256, "config-sha256", "", "refuse a config with another SHA-256")
+	flags.BoolVar(&options.killSwitch, "kill-switch", false, "block traffic outside the TUN until the App disconnects")
+	flags.BoolVar(&options.killSwitchLAN, "kill-switch-lan", false, "let the local network pass the kill switch")
+	flags.StringVar(&options.killSwitchApp, "kill-switch-app", "", "another executable whose traffic passes the kill switch")
+	flags.BoolVar(&options.killSwitchPersistent, "kill-switch-persistent", false, "keep the kill switch across a reboot")
 	if err := flags.Parse(args[1:]); err != nil {
 		return options, err
 	}
@@ -51,6 +60,14 @@ func parseRunOptions(args []string) (runOptions, error) {
 	if options.configSHA256 != "" && !isSHA256Hex(options.configSHA256) {
 		return options, errors.New("config-sha256 must be 64 hex characters")
 	}
+	// The kill switch filters need administrator rights, which only the TUN
+	// Core has, and they let the tunnel through by its adapter.
+	if options.killSwitch && options.interfaceName == "" {
+		return options, errors.New("kill-switch needs the TUN options dns and interface")
+	}
+	if !options.killSwitch && (options.killSwitchLAN || options.killSwitchApp != "" || options.killSwitchPersistent) {
+		return options, errors.New("kill-switch options need kill-switch")
+	}
 	return options, nil
 }
 
@@ -68,10 +85,20 @@ func isSHA256Hex(value string) bool {
 
 func execute(args []string, run func(runOptions) error, stdout, stderr io.Writer) int {
 	usage := func() {
-		fmt.Fprintln(stdout, "Usage: xray run [-dns <IP:port> -interface <name>] -config <xray.json> [-config-sha256 <hex>] [-error-file <path>] [-stop-file <path>]")
+		fmt.Fprintln(stdout, "Usage: xray run [-dns <IP:port> -interface <name> [-kill-switch [-kill-switch-lan] [-kill-switch-app <path>] [-kill-switch-persistent]]] -config <xray.json> [-config-sha256 <hex>] [-error-file <path>] [-stop-file <path>]")
+		fmt.Fprintln(stdout, "       xray unblock")
 	}
 	if len(args) == 1 && (args[0] == "-h" || args[0] == "--help") {
 		usage()
+		return 0
+	}
+	// After a crash the kill switch stays engaged. The App lifts it itself;
+	// this is the fallback for when its user may not, run elevated.
+	if len(args) == 1 && args[0] == "unblock" {
+		if err := liftKillSwitch(); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
 		return 0
 	}
 

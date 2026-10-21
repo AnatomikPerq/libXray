@@ -3,6 +3,8 @@ package libXray
 
 import (
 	"encoding/json"
+
+	"github.com/xtls/libxray/killswitch"
 )
 
 type LibXrayMethod string
@@ -26,6 +28,9 @@ const (
 	LibXrayMethodStopMinewire                LibXrayMethod = "stopMinewire"
 	LibXrayMethodMinewireState               LibXrayMethod = "minewireState"
 	LibXrayMethodControlXray                 LibXrayMethod = "controlXray"
+	LibXrayMethodKillSwitchState             LibXrayMethod = "killSwitchState"
+	LibXrayMethodLiftKillSwitch              LibXrayMethod = "liftKillSwitch"
+	LibXrayMethodResolveHost                 LibXrayMethod = "resolveHost"
 )
 
 type LibXrayInvokeRequest struct {
@@ -164,4 +169,22 @@ type XrayVersionResponse struct {
 
 type GetXrayStateResponse struct {
 	Running bool `json:"running"`
+}
+
+// ResolveHostRequest resolves a server name from the calling process.
+type ResolveHostRequest struct {
+	Host           string `json:"host"`
+	TimeoutSeconds int    `json:"timeoutSeconds,omitempty"`
+}
+
+// ResolveHostResponse lists the addresses, IPv4 first.
+type ResolveHostResponse struct {
+	Addresses []string `json:"addresses"`
+}
+
+// KillSwitchStateResponse tells whether the kill switch filters are in place,
+// and which session this is, for comparing with the session they were left in.
+type KillSwitchStateResponse struct {
+	Engaged bool               `json:"engaged"`
+	Session killswitch.Session `json:"session"`
 }

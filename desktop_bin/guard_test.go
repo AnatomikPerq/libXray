@@ -75,9 +75,25 @@ func TestStopRequestedFiresWhenFileAppears(t *testing.T) {
 		t.Fatal(err)
 	}
 	select {
-	case <-done:
+	case reason := <-done:
+		if reason != stopDisconnect {
+			t.Fatalf("an empty stop file is a disconnect, got %d", reason)
+		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("stop file was not noticed")
+	}
+}
+
+func TestStopFileTellsRestartFromDisconnect(t *testing.T) {
+	for content, want := range map[string]stopReason{
+		"":            stopDisconnect,
+		"restart":     stopRestart,
+		"restart\r\n": stopRestart,
+		"anything":    stopDisconnect,
+	} {
+		if got := readStopReason([]byte(content)); got != want {
+			t.Errorf("stop file %q: got %d, want %d", content, got, want)
+		}
 	}
 }
 

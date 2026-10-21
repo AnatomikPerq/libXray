@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/xtls/libxray/killswitch"
 )
 
 func TestParseRunOptions(t *testing.T) {
@@ -37,6 +39,63 @@ func TestParseRunOptions(t *testing.T) {
 	} {
 		if _, err := parseRunOptions(args); err == nil {
 			t.Fatalf("incomplete options were accepted: %v", args)
+		}
+	}
+}
+
+func TestParseKillSwitchOptions(t *testing.T) {
+	options, err := parseRunOptions([]string{
+		"run", "-dns", "8.8.8.8:53", "-interface", "Ethernet", "-config", "xray.json",
+		"-kill-switch", "-kill-switch-lan", "-kill-switch-app", `C:\HYPER CLIENT\HyperClient.exe`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !options.killSwitch || !options.killSwitchLAN || options.killSwitchApp != `C:\HYPER CLIENT\HyperClient.exe` || options.killSwitchPersistent {
+		t.Fatalf("unexpected options: %#v", options)
+	}
+
+	for _, args := range [][]string{
+		// Proxy mode runs unelevated and has no tunnel to let through.
+		{"run", "-config", "xray.json", "-kill-switch"},
+		{"run", "-dns", "8.8.8.8:53", "-interface", "Ethernet", "-config", "xray.json", "-kill-switch-lan"},
+		{"run", "-dns", "8.8.8.8:53", "-interface", "Ethernet", "-config", "xray.json", "-kill-switch-persistent"},
+		{"run", "-dns", "8.8.8.8:53", "-interface", "Ethernet", "-config", "xray.json", "-kill-switch-app", "app.exe"},
+	} {
+		if _, err := parseRunOptions(args); err == nil {
+			t.Fatalf("invalid kill switch options were accepted: %v", args)
+		}
+	}
+}
+
+func TestCommandUnblockLiftsTheKillSwitch(t *testing.T) {
+	lifted := 0
+	liftKillSwitch = func() error { lifted++; return nil }
+	t.Cleanup(func() { liftKillSwitch = killswitch.Lift })
+	var stdout, stderr bytes.Buffer
+	code := execute([]string{"unblock"}, func(runOptions) error {
+		t.Fatal("unblock must not run a Core")
+		return nil
+	}, &stdout, &stderr)
+	if code != 0 || lifted != 1 {
+		t.Fatalf("unblock: code=%d, lifted=%d, stderr=%q", code, lifted, stderr.String())
+	}
+
+	liftKillSwitch = func() error { return errors.New("access denied") }
+	stderr.Reset()
+	if code := execute([]string{"unblock"}, nil, &stdout, &stderr); code != 1 || stderr.String() != "access denied\n" {
+		t.Fatalf("failed unblock: code=%d, stderr=%q", code, stderr.String())
+	}
+}
+
+func TestTunInboundName(t *testing.T) {
+	config := []byte(`{"inbounds":[{"protocol":"socks","settings":{"name":"no"}},{"protocol":"tun","settings":{"name":"HyperClientTun"}}]}`)
+	if got := tunInboundName(config); got != "HyperClientTun" {
+		t.Fatalf("got %q", got)
+	}
+	for _, config := range []string{`{"inbounds":[{"protocol":"socks"}]}`, `{"inbounds":[{"protocol":"tun"}]}`, `not json`} {
+		if got := tunInboundName([]byte(config)); got != "" {
+			t.Fatalf("%s: got %q", config, got)
 		}
 	}
 }

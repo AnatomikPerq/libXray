@@ -54,6 +54,14 @@ func run(options runOptions) error {
 			return err
 		}
 	}
+	// Only now is the connection usable; the App reports it connected once
+	// this is written.
+	if options.ready != nil {
+		if err := options.ready(); err != nil {
+			xray.StopXray()
+			return err
+		}
+	}
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)

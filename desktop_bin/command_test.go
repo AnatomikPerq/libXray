@@ -172,6 +172,62 @@ func TestCommandRejectsUnwritableErrorFileBeforeRun(t *testing.T) {
 	}
 }
 
+func TestCommandWritesReadyOnlyWhenRunSaysSo(t *testing.T) {
+	path := filepath.Join(commandTestDirectory(t), "xray.json.ready")
+	if err := os.WriteFile(path, []byte("ready"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	args := []string{"run", "-dns", "8.8.8.8:53", "-interface", "Ethernet", "-config", "xray.json", "-ready-file", path}
+	var stdout, stderr bytes.Buffer
+	code := execute(args, func(options runOptions) error {
+		data, err := os.ReadFile(path)
+		if err != nil || len(data) != 0 {
+			t.Fatalf("a previous start's ready mark remains: %q, err=%v", data, err)
+		}
+		if options.ready == nil {
+			t.Fatal("run got no way to report readiness")
+		}
+		return options.ready()
+	}, &stdout, &stderr)
+	if code != 0 || stderr.Len() != 0 {
+		t.Fatalf("run failed: code=%d, stderr=%q", code, stderr.String())
+	}
+	if data, err := os.ReadFile(path); err != nil || string(data) != "ready" {
+		t.Fatalf("ready file: %q, err=%v", data, err)
+	}
+}
+
+func TestCommandFailedRunLeavesReadyEmpty(t *testing.T) {
+	path := filepath.Join(commandTestDirectory(t), "xray.json.ready")
+	if err := os.WriteFile(path, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	args := []string{"run", "-dns", "8.8.8.8:53", "-interface", "Ethernet", "-config", "xray.json", "-ready-file", path}
+	var stdout, stderr bytes.Buffer
+	code := execute(args, func(runOptions) error {
+		return errors.New("failed to create the TUN adapter")
+	}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("failed run exited with %d", code)
+	}
+	if data, err := os.ReadFile(path); err != nil || len(data) != 0 {
+		t.Fatalf("ready file after a failure: %q, err=%v", data, err)
+	}
+}
+
+func TestCommandRejectsUnwritableReadyFileBeforeRun(t *testing.T) {
+	path := filepath.Join(commandTestDirectory(t), "missing", "ready")
+	args := []string{"run", "-dns", "8.8.8.8:53", "-interface", "Ethernet", "-config", "xray.json", "-ready-file", path}
+	var stdout, stderr bytes.Buffer
+	code := execute(args, func(runOptions) error {
+		t.Fatal("run must not start when its ready file cannot be prepared")
+		return nil
+	}, &stdout, &stderr)
+	if code != 1 || !bytes.Contains(stderr.Bytes(), []byte(path)) {
+		t.Fatalf("missing file error: code=%d, stderr=%q", code, stderr.String())
+	}
+}
+
 func commandTestDirectory(t *testing.T) string {
 	t.Helper()
 	root := filepath.Join("..", "..", "references", "libxray-desktop-tests")

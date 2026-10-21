@@ -16,12 +16,17 @@ type runOptions struct {
 	configPath    string
 	errorFile     string
 	stopFile      string
+	readyFile     string
 	configSHA256  string
 
 	killSwitch           bool
 	killSwitchLAN        bool
 	killSwitchApp        string
 	killSwitchPersistent bool
+
+	// ready, when set, records that Xray runs and the tunnel passes the kill
+	// switch; execute opens the ready file before run.
+	ready func() error
 }
 
 func parseRunOptions(args []string) (runOptions, error) {
@@ -37,6 +42,7 @@ func parseRunOptions(args []string) (runOptions, error) {
 	flags.StringVar(&options.configPath, "config", "", "Xray JSON configuration path")
 	flags.StringVar(&options.errorFile, "error-file", "", "also write command errors to this file")
 	flags.StringVar(&options.stopFile, "stop-file", "", "stop gracefully once this file appears")
+	flags.StringVar(&options.readyFile, "ready-file", "", "write ready to this file once Xray runs")
 	flags.StringVar(&options.configSHA256, "config-sha256", "", "refuse a config with another SHA-256")
 	flags.BoolVar(&options.killSwitch, "kill-switch", false, "block traffic outside the TUN until the App disconnects")
 	flags.BoolVar(&options.killSwitchLAN, "kill-switch-lan", false, "let the local network pass the kill switch")
@@ -85,7 +91,7 @@ func isSHA256Hex(value string) bool {
 
 func execute(args []string, run func(runOptions) error, stdout, stderr io.Writer) int {
 	usage := func() {
-		fmt.Fprintln(stdout, "Usage: xray run [-dns <IP:port> -interface <name> [-kill-switch [-kill-switch-lan] [-kill-switch-app <path>] [-kill-switch-persistent]]] -config <xray.json> [-config-sha256 <hex>] [-error-file <path>] [-stop-file <path>]")
+		fmt.Fprintln(stdout, "Usage: xray run [-dns <IP:port> -interface <name> [-kill-switch [-kill-switch-lan] [-kill-switch-app <path>] [-kill-switch-persistent]]] -config <xray.json> [-config-sha256 <hex>] [-error-file <path>] [-stop-file <path>] [-ready-file <path>]")
 		fmt.Fprintln(stdout, "       xray unblock")
 	}
 	if len(args) == 1 && (args[0] == "-h" || args[0] == "--help") {
@@ -118,6 +124,22 @@ func execute(args []string, run func(runOptions) error, stdout, stderr io.Writer
 			return 1
 		}
 		defer diagnostics.Close()
+	}
+	if err == nil && options.readyFile != "" {
+		// Starting Xray may take a while (geodata, the TUN adapter): the App
+		// waits for this file instead of trusting a running process. Cleared
+		// and pinned like the error file.
+		var ready *os.File
+		ready, err = openOwnedFile(options.readyFile, os.O_TRUNC)
+		if err == nil {
+			defer ready.Close()
+			options.ready = func() error {
+				if _, err := ready.WriteString("ready"); err != nil {
+					return err
+				}
+				return ready.Sync()
+			}
+		}
 	}
 	if err == nil {
 		err = run(options)

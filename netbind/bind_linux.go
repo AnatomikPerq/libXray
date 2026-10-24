@@ -1,8 +1,8 @@
-package minewire
+package netbind
 
 import "syscall"
 
-func bindToInterface(name, _, _ string, conn syscall.RawConn) error {
+func Bind(name, _, _ string, conn syscall.RawConn) error {
 	var bindErr error
 	err := conn.Control(func(fd uintptr) {
 		bindErr = syscall.SetsockoptString(int(fd), syscall.SOL_SOCKET, syscall.SO_BINDTODEVICE, name)

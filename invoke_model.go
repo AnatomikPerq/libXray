@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/xtls/libxray/killswitch"
+	"github.com/xtls/libxray/netreport"
 )
 
 type LibXrayMethod string
@@ -31,6 +32,9 @@ const (
 	LibXrayMethodKillSwitchState             LibXrayMethod = "killSwitchState"
 	LibXrayMethodLiftKillSwitch              LibXrayMethod = "liftKillSwitch"
 	LibXrayMethodResolveHost                 LibXrayMethod = "resolveHost"
+	LibXrayMethodStartNetworkReport          LibXrayMethod = "startNetworkReport"
+	LibXrayMethodNetworkReportState          LibXrayMethod = "networkReportState"
+	LibXrayMethodCancelNetworkReport         LibXrayMethod = "cancelNetworkReport"
 )
 
 type LibXrayInvokeRequest struct {
@@ -181,6 +185,24 @@ type ResolveHostRequest struct {
 type ResolveHostResponse struct {
 	Addresses []string `json:"addresses"`
 }
+
+// StartNetworkReportRequest is netreport.Request: interface, systemDns,
+// sections, sites, maxBytes, bypass.
+type StartNetworkReportRequest = netreport.Request
+
+type StartNetworkReportResponse struct {
+	ID string `json:"id"`
+}
+
+// NetworkReportRequest names a run for networkReportState and
+// cancelNetworkReport.
+type NetworkReportRequest struct {
+	ID string `json:"id"`
+}
+
+// NetworkReportStateResponse is netreport.Snapshot: running, progress, error
+// and the report so far.
+type NetworkReportStateResponse = netreport.Snapshot
 
 // KillSwitchStateResponse tells whether the kill switch filters are in place,
 // and which session this is, for comparing with the session they were left in.

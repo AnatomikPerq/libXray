@@ -278,10 +278,14 @@ minewireState
 killSwitchState
 liftKillSwitch
 resolveHost
+startNetworkReport
+networkReportState
+cancelNetworkReport
 ```
 
-The last seven methods belong to the HYPER CLIENT fork; see [control](#control),
-[minewire](#minewire) and [kill switch](#kill-switch).
+The last ten methods belong to the HYPER CLIENT fork; see [control](#control),
+[minewire](#minewire), [kill switch](#kill-switch) and
+[network report](#network-report).
 
 ## control
 
@@ -377,6 +381,46 @@ resolver, IPv4 first. The queries leave from the calling process; the system
 resolver would hand them to Windows' DNS Client service, which the kill switch
 blocks outside the tunnel, so the App could not resolve a minewire server while
 it reconnects.
+
+## network report
+
+Package `netreport` measures how the network treats DNS, TLS, UDP and the
+networks VPN servers rent from, for a report the user hands to a VPN provider.
+Every probe binds to the requested interface (`netbind`, as minewire uplinks
+do), never uses the environment's proxy, and takes target addresses from DoH,
+so a running tunnel or a spoofed DNS answer does not hide what happens on the
+way to the real address.
+
+A run takes one to three minutes, so it runs in the background:
+
+```json
+{"method": "startNetworkReport", "payload": {
+  "interface": "Ethernet 4", "systemDns": ["10.0.0.1"],
+  "sections": ["network", "dns", "sites", "hosting", "udp"],
+  "sites": ["example.org"], "maxBytes": 262144, "bypass": true}}
+```
+
+returns `{"id": "..."}`; `networkReportState` (`id`) returns `running`,
+`progress` (`section`, `done`, `total`), `error` and the `report` so far;
+`cancelNetworkReport` (`id`) stops it and keeps what finished. One run at a
+time; finished runs are kept for ten minutes. All payload fields are optional:
+an empty interface uses the default route, `systemDns` replaces the
+interface's resolvers (Android and iOS hide them from Go), no sections means
+all.
+
+The report (`version` 1) holds `network` (adapter kind, external IPv4/IPv6
+with AS and holder from Team Cymru's DNS zone, else RIPEstat), `dns` (each
+resolver over UDP from fresh sockets: loss, forged answers judged against DoH,
+injection seen as a second answer, egress holder for interception), `sites`,
+`hosting`, `sni`, `udp` (STUN, QUIC handshakes) and `facts`. With `bypass`
+a refused name is retried with the ClientHello in two TCP segments (`split`)
+and re-framed into small TLS records the way Xray's `freedom` fragment
+"tlshello" does (`fragment`, then the same request over it:
+`fragmentTransfer`); only application-level cutting, no packet tricks. Statuses are in
+`netreport/report.go`; the catalog of targets is `netreport/catalog.json`.
+Live run: `go test ./netreport -run TestLive -netreport.live
+-netreport.iface "<interface>" [-netreport.dns <resolvers>]
+-netreport.out report.json -v`.
 
 ## controller
 

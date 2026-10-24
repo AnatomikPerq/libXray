@@ -3,7 +3,8 @@ package minewire
 import (
 	"context"
 	"net"
-	"syscall"
+
+	"github.com/xtls/libxray/netbind"
 )
 
 // boundDialer dials through the named interface. If the interface is gone
@@ -11,11 +12,7 @@ import (
 // the uplink out of the tunnel, only through the Core.
 func boundDialer(name string) func(ctx context.Context, network, address string) (net.Conn, error) {
 	return func(ctx context.Context, network, address string) (net.Conn, error) {
-		bound := net.Dialer{
-			Control: func(network, address string, conn syscall.RawConn) error {
-				return bindToInterface(name, network, address, conn)
-			},
-		}
+		bound := net.Dialer{Control: netbind.Control(name)}
 		conn, err := bound.DialContext(ctx, network, address)
 		if err == nil || ctx.Err() != nil {
 			return conn, err

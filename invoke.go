@@ -9,6 +9,7 @@ import (
 	"github.com/xtls/libxray/geo"
 	"github.com/xtls/libxray/killswitch"
 	"github.com/xtls/libxray/minewire"
+	"github.com/xtls/libxray/netreport"
 	"github.com/xtls/libxray/nodep"
 	"github.com/xtls/libxray/share"
 	"github.com/xtls/libxray/xray"
@@ -94,6 +95,16 @@ func Invoke(requestJSON string) string {
 		return encodeInvokeNoDataResponse(killswitch.Lift())
 	case LibXrayMethodResolveHost:
 		return invokeResolveHost(request.Payload)
+	case LibXrayMethodStartNetworkReport:
+		return invokeStartNetworkReport(request.Payload)
+	case LibXrayMethodNetworkReportState:
+		return invokeNetworkReportState(request.Payload)
+	case LibXrayMethodCancelNetworkReport:
+		run, err := decodePayload[NetworkReportRequest](request.Payload)
+		if err != nil {
+			return encodeInvokeNoDataResponse(err)
+		}
+		return encodeInvokeNoDataResponse(netreport.Cancel(run.ID))
 	default:
 		return encodeInvokeResponse(nil, errors.New("unknown method"))
 	}

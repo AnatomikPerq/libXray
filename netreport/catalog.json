@@ -1,0 +1,82 @@
+{
+  "resolvers": [
+    {"id": "google", "name": "Google", "address": "8.8.8.8", "doh": "https://8.8.8.8/dns-query", "operator": "google"},
+    {"id": "cloudflare", "name": "Cloudflare", "address": "1.1.1.1", "doh": "https://1.1.1.1/dns-query", "operator": "cloudflare"},
+    {"id": "quad9", "name": "Quad9", "address": "9.9.9.9", "doh": "https://9.9.9.9/dns-query", "operator": "quad9|woodynet|pch|i3d"},
+    {"id": "adguard", "name": "AdGuard", "address": "94.140.14.14", "doh": "https://94.140.14.14/dns-query", "operator": "adguard|datacamp"},
+    {"id": "yandex", "name": "Yandex", "address": "77.88.8.8", "operator": "yandex"}
+  ],
+  "dnsControl": ["example.com", "www.wikipedia.org", "ya.ru"],
+  "dnsProbe": [
+    "rutracker.org", "www.instagram.com", "www.facebook.com", "x.com", "www.youtube.com",
+    "discord.com", "www.linkedin.com", "www.torproject.org", "meduza.io", "signal.org"
+  ],
+  "sites": [
+    {"id": "youtube", "name": "YouTube", "group": "video", "host": "www.youtube.com", "quic": true},
+    {"id": "youtube-video", "name": "YouTube video", "group": "video", "host": "redirector.googlevideo.com"},
+    {"id": "twitch", "name": "Twitch", "group": "video", "host": "www.twitch.tv"},
+    {"id": "tiktok", "name": "TikTok", "group": "video", "host": "www.tiktok.com"},
+    {"id": "instagram", "name": "Instagram", "group": "social", "host": "www.instagram.com", "quic": true},
+    {"id": "facebook", "name": "Facebook", "group": "social", "host": "www.facebook.com", "quic": true},
+    {"id": "x", "name": "X", "group": "social", "host": "x.com"},
+    {"id": "linkedin", "name": "LinkedIn", "group": "social", "host": "www.linkedin.com"},
+    {"id": "reddit", "name": "Reddit", "group": "social", "host": "www.reddit.com"},
+    {"id": "telegram", "name": "Telegram", "group": "messengers", "host": "web.telegram.org"},
+    {"id": "telegram-api", "name": "Telegram API", "group": "messengers", "host": "api.telegram.org"},
+    {"id": "whatsapp", "name": "WhatsApp", "group": "messengers", "host": "web.whatsapp.com"},
+    {"id": "discord", "name": "Discord", "group": "messengers", "host": "discord.com"},
+    {"id": "signal", "name": "Signal", "group": "messengers", "host": "signal.org"},
+    {"id": "viber", "name": "Viber", "group": "messengers", "host": "www.viber.com"},
+    {"id": "chatgpt", "name": "ChatGPT", "group": "ai", "host": "chatgpt.com", "geo": {"status": [403], "body": ["blocked-icon", "unsupported_country"]}},
+    {"id": "openai-api", "name": "OpenAI API", "group": "ai", "host": "api.openai.com", "path": "/v1/models", "geo": {"body": ["unsupported_country"]}},
+    {"id": "claude", "name": "Claude", "group": "ai", "host": "claude.ai", "geo": {"location": ["app-unavailable-in-region"]}},
+    {"id": "anthropic-api", "name": "Anthropic API", "group": "ai", "host": "api.anthropic.com", "path": "/v1/models", "geo": {"status": [403], "body": ["Request not allowed"]}},
+    {"id": "gemini", "name": "Gemini", "group": "ai", "host": "gemini.google.com", "path": "/app"},
+    {"id": "grok", "name": "Grok", "group": "ai", "host": "grok.com", "geo": {"body": ["not available in your region"]}},
+    {"id": "github", "name": "GitHub", "group": "dev", "host": "github.com", "regular": true},
+    {"id": "github-raw", "name": "GitHub Raw", "group": "dev", "host": "raw.githubusercontent.com"},
+    {"id": "docker-hub", "name": "Docker Hub", "group": "dev", "host": "registry-1.docker.io", "path": "/v2/"},
+    {"id": "wikipedia", "name": "Wikipedia", "group": "other", "host": "ru.wikipedia.org", "regular": true},
+    {"id": "google", "name": "Google", "group": "other", "host": "www.google.com", "quic": true, "regular": true},
+    {"id": "cloudflare", "name": "Cloudflare", "group": "other", "host": "www.cloudflare.com"},
+    {"id": "rutracker", "name": "RuTracker", "group": "other", "host": "rutracker.org"},
+    {"id": "proton", "name": "Proton", "group": "other", "host": "proton.me"},
+    {"id": "spotify", "name": "Spotify", "group": "other", "host": "www.spotify.com", "path": "/ru-ru/premium/", "geo": {"location": ["why-not-available"]}},
+    {"id": "canva", "name": "Canva", "group": "other", "host": "www.canva.com", "geo": {"location": ["restricted-access"]}},
+    {"id": "yandex", "name": "Yandex", "group": "ru", "host": "ya.ru", "whitelist": true},
+    {"id": "vk", "name": "VK", "group": "ru", "host": "vk.com", "whitelist": true},
+    {"id": "gosuslugi", "name": "Gosuslugi", "group": "ru", "host": "www.gosuslugi.ru", "whitelist": true},
+    {"id": "max", "name": "MAX", "group": "ru", "host": "max.ru", "whitelist": true}
+  ],
+  "hosting": [
+    {"id": "cloudflare", "name": "Cloudflare", "host": "speed.cloudflare.com", "path": "/__down?bytes={bytes}", "foreign": true},
+    {"id": "hetzner-fsn", "name": "Hetzner", "country": "DE", "host": "fsn1-speed.hetzner.com", "path": "/100MB.bin", "range": true, "foreign": true},
+    {"id": "hetzner-hel", "name": "Hetzner", "country": "FI", "host": "hel1-speed.hetzner.com", "path": "/100MB.bin", "range": true, "foreign": true},
+    {"id": "hetzner-ash", "name": "Hetzner", "country": "US", "host": "ash-speed.hetzner.com", "path": "/100MB.bin", "range": true, "foreign": true},
+    {"id": "ovh", "name": "OVH", "country": "FR", "host": "proof.ovh.net", "path": "/files/1Mb.dat", "range": true, "foreign": true},
+    {"id": "vultr-ams", "name": "Vultr", "country": "NL", "host": "ams-nl-ping.vultr.com", "path": "/vultr.com.100MB.bin", "range": true, "foreign": true},
+    {"id": "scaleway", "name": "Scaleway", "country": "FR", "host": "scaleway.testdebit.info", "path": "/1M.iso", "range": true, "foreign": true},
+    {"id": "gcore", "name": "Gcore", "country": "LU", "host": "lg.gcore.lu", "path": "/", "foreign": true},
+    {"id": "google-cloud", "name": "Google Cloud", "host": "storage.googleapis.com", "path": "/gcp-public-data-landsat/index.csv.gz", "range": true, "foreign": true},
+    {"id": "amazon", "name": "Amazon AWS", "country": "DE", "host": "s3.eu-central-1.amazonaws.com", "path": "/", "foreign": true},
+    {"id": "selectel", "name": "Selectel", "country": "RU", "host": "speedtest.selectel.ru", "path": "/100MB", "range": true},
+    {"id": "yandex-cloud", "name": "Yandex Cloud", "country": "RU", "host": "storage.yandexcloud.net", "path": "/"}
+  ],
+  "whitelistSni": [
+    "ya.ru", "vk.com", "www.gosuslugi.ru", "max.ru", "ozon.ru", "www.wildberries.ru",
+    "mail.ru", "www.sberbank.ru", "dzen.ru", "rutube.ru", "avito.ru", "2gis.ru"
+  ],
+  "stun": [
+    {"id": "google", "name": "Google", "host": "stun.l.google.com", "port": 19302},
+    {"id": "cloudflare", "name": "Cloudflare", "host": "stun.cloudflare.com", "port": 3478},
+    {"id": "nextcloud", "name": "Nextcloud", "host": "stun.nextcloud.com", "port": 3478}
+  ],
+  "quic": [
+    {"id": "google", "name": "Google", "host": "www.google.com"},
+    {"id": "youtube", "name": "YouTube", "host": "www.youtube.com"},
+    {"id": "cloudflare", "name": "Cloudflare", "host": "cloudflare-quic.com"},
+    {"id": "instagram", "name": "Instagram", "host": "www.instagram.com"}
+  ],
+  "externalIPv4": ["http://api.ipify.org", "https://api.ipify.org", "http://icanhazip.com", "http://checkip.amazonaws.com"],
+  "externalIPv6": ["https://api6.ipify.org", "https://ipv6.icanhazip.com"]
+}

@@ -37,7 +37,7 @@ func parseRunOptions(args []string) (runOptions, error) {
 
 	flags := flag.NewFlagSet("run", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
-	flags.StringVar(&options.dns, "dns", "", "DNS server IP endpoint")
+	flags.StringVar(&options.dns, "dns", "", `DNS server IP endpoint, or "network" for the interface's own`)
 	flags.StringVar(&options.interfaceName, "interface", "", "outbound network interface")
 	flags.StringVar(&options.configPath, "config", "", "Xray JSON configuration path")
 	flags.StringVar(&options.errorFile, "error-file", "", "also write command errors to this file")

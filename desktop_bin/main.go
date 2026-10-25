@@ -39,7 +39,14 @@ func run(options runOptions) error {
 		}
 	}
 	if options.interfaceName != "" {
-		if err := dns.SetDNS(options.dns, options.interfaceName); err != nil {
+		if options.dns == dns.NetworkDNS {
+			// The resolver the interface itself is configured with, as every
+			// app uses it without the VPN; a fixed public one lost a quarter
+			// of fresh-socket queries on the owner's home network.
+			if _, err := dns.SetNetworkDNS(options.interfaceName, fallbackDNS); err != nil {
+				return err
+			}
+		} else if err := dns.SetDNS(options.dns, options.interfaceName); err != nil {
 			return err
 		}
 		defer dns.ResetDNS()
@@ -92,6 +99,10 @@ const (
 	// switch stays, so nothing slips out in between.
 	stopRestart
 )
+
+// fallbackDNS answers the Core's own lookups when the interface has no
+// resolver of its own that answers (owner's decision of 25.10.2026).
+const fallbackDNS = "1.1.1.1:53"
 
 // restartRequest is what the App writes into the stop file when another Core
 // follows. An empty file, as older Apps create it, means a disconnect.

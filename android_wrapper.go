@@ -7,6 +7,7 @@ import (
 
 	c "github.com/xtls/libxray/controller"
 	"github.com/xtls/libxray/dns"
+	"github.com/xtls/libxray/netbind"
 )
 
 type DialerController interface {
@@ -38,6 +39,20 @@ type ProcessFinder interface {
 
 func RegisterDialerController(controller DialerController) {
 	c.RegisterDialerController(func(fd uintptr) bool {
+		return controller.ProtectFd(int(fd))
+	})
+}
+
+// RegisterSocketProtector keeps the App process's own sockets (minewire
+// uplinks, network report probes) out of the VPN this app runs. Xray's
+// dialer controller stays the Core's: pings and temporary cores are not
+// touched. Pass nil to unregister.
+func RegisterSocketProtector(controller DialerController) {
+	if controller == nil {
+		netbind.SetProtector(nil)
+		return
+	}
+	netbind.SetProtector(func(fd uintptr) bool {
 		return controller.ProtectFd(int(fd))
 	})
 }

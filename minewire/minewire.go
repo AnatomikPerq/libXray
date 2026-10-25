@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"github.com/dmitrymodder/minewire-cli/src/core"
+	"github.com/xtls/libxray/netbind"
 )
 
 var (
@@ -111,7 +112,7 @@ func engineConfig(options StartOptions, port int) core.Config {
 	// The realistic mode's bandwidth defaults: left at zero, its throttle
 	// never refills and every upload write spins forever.
 	cfg.ApplyDefaults(nil)
-	if options.Interface != "" {
+	if options.Interface != "" || netbind.Protecting() {
 		cfg.Dial = boundDialer(options.Interface)
 	}
 	return cfg

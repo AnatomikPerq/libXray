@@ -8,6 +8,8 @@ import (
 	"net"
 	"os"
 	"strings"
+
+	"github.com/xtls/libxray/netbind"
 )
 
 // interfaceInfo reads what the standard library offers. Mobile platforms
@@ -22,7 +24,10 @@ func interfaceInfo(name string) (*InterfaceInfo, error) {
 		}
 		iface = found
 	} else {
-		conn, err := net.Dial("udp4", "1.1.1.1:53")
+		// Protected on Android: with the VPN up the probes leave through the
+		// physical network, and so must this lookup of its address.
+		dialer := net.Dialer{Control: netbind.Control("")}
+		conn, err := dialer.Dial("udp4", "1.1.1.1:53")
 		if err != nil {
 			return nil, err
 		}

@@ -466,6 +466,14 @@ ProcessFinder finder = new ProcessFinder() {
 LibXray.registerProcessFinder(finder, Build.VERSION.SDK_INT);
 ```
 
+A `process` rule then matches the UID as a string (`"process": ["10123"]`).
+Sniffing and FakeDNS replace a connection's target with its domain before
+routing, and upstream Xray-core passed no destination to the finder then, so
+`getConnectionOwnerUid` found nothing; libXray builds against a patched copy
+of Xray-core in `third_party/xray-core` (a `replace` in `go.mod`) that passes
+the original destination. `third_party/xray-core/PATCHES.md` lists the change
+and how to move to another Xray-core version.
+
 ## geo
 
 ### count

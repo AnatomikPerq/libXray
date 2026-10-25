@@ -10,7 +10,7 @@ from uuid import uuid4
 from app.android import AndroidBuilder
 from app.apple_go import AppleGoBuilder
 from app.apple_gomobile import AppleGoMobileBuilder
-from app.build import LIBXRAY_MOD_NAME, XRAY_CORE_MOD_NAME, DEFAULT_XRAY_CORE_VERSION
+from app.build import LIBXRAY_MOD_NAME, XRAY_CORE_MOD_NAME, PATCHED_XRAY_CORE_REPLACE_PATH
 from app.linux import LinuxBuilder
 from app.windows import WindowsBuilder
 from main import parse_build_args
@@ -136,10 +136,10 @@ class BuildTest(unittest.TestCase):
                         "go", "mod", "edit", f"-replace={XRAY_CORE_MOD_NAME}=../Xray-core",
                     ]))
                 else:
-                    expected.extend([
-                        call(["go", "mod", "edit", f"-dropreplace={XRAY_CORE_MOD_NAME}"]),
-                        call(["go", "get", f"{XRAY_CORE_MOD_NAME}@{DEFAULT_XRAY_CORE_VERSION}"]),
-                    ])
+                    expected.append(call([
+                        "go", "mod", "edit",
+                        f"-replace={XRAY_CORE_MOD_NAME}={PATCHED_XRAY_CORE_REPLACE_PATH}",
+                    ]))
                 expected.append(call(["go", "mod", "tidy"]))
                 self.assertEqual(commands.call_args_list, expected)
 

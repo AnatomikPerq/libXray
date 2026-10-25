@@ -75,3 +75,7 @@ require (
 // frames per write, an injectable dialer, no panics on malformed frames.
 // See third_party/minewire-cli/PATCHES.md.
 replace github.com/dmitrymodder/minewire-cli => ./third_party/minewire-cli
+
+// Xray-core with a process lookup that works on Android after sniffing.
+// See third_party/xray-core/PATCHES.md.
+replace github.com/xtls/xray-core => ./third_party/xray-core

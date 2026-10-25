@@ -9,8 +9,9 @@ from app.cmd import (
 
 LIBXRAY_MOD_NAME = "github.com/xtls/libxray"
 XRAY_CORE_MOD_NAME = "github.com/xtls/xray-core"
-# Go modules resolve the Xray-core v26.10.21 release tag through this version.
-DEFAULT_XRAY_CORE_VERSION = "v1.260327.1-0.20261021115930-1b1647cd9ddf"
+# Fork: builds use the patched Xray-core copy (its PATCHES.md names the
+# upstream version), never a module fetched from upstream.
+PATCHED_XRAY_CORE_REPLACE_PATH = "./third_party/xray-core"
 LOCAL_XRAY_CORE_DIR_NAME = "Xray-core"
 
 
@@ -83,29 +84,21 @@ class Builder(object):
             if ret.returncode != 0:
                 raise Exception("go mod init failed")
 
-        if self.use_local_xray_core:
-            ret = subprocess.run(
-                [
-                    "go",
-                    "mod",
-                    "edit",
-                    f"-replace={XRAY_CORE_MOD_NAME}={self.xray_core_replace_path}",
-                ]
-            )
-            if ret.returncode != 0:
-                raise Exception("go mod edit replace failed")
-        else:
-            ret = subprocess.run(
-                ["go", "mod", "edit", f"-dropreplace={XRAY_CORE_MOD_NAME}"]
-            )
-            if ret.returncode != 0:
-                raise Exception("go mod edit dropreplace failed")
-
-            ret = subprocess.run(
-                ["go", "get", f"{XRAY_CORE_MOD_NAME}@{DEFAULT_XRAY_CORE_VERSION}"]
-            )
-            if ret.returncode != 0:
-                raise Exception("go get xray-core failed")
+        replace_path = (
+            self.xray_core_replace_path
+            if self.use_local_xray_core
+            else PATCHED_XRAY_CORE_REPLACE_PATH
+        )
+        ret = subprocess.run(
+            [
+                "go",
+                "mod",
+                "edit",
+                f"-replace={XRAY_CORE_MOD_NAME}={replace_path}",
+            ]
+        )
+        if ret.returncode != 0:
+            raise Exception("go mod edit replace failed")
 
         ret = subprocess.run(
             [

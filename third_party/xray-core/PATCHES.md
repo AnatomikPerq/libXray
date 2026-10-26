@@ -22,8 +22,20 @@ Changes, each marked `libXray patch` in the code:
   profiles never matched. `originalTarget` reads it from the session
   (`Outbound.OriginalTarget`, which the dispatcher records before sniffing).
 
+- `app/dns/nameserver_local.go` (tested in `app/dns/libxray_patch_test.go`):
+  the `localhost` server reports a name the system resolver does not know
+  (`net.DNSError.IsNotFound`) as NXDOMAIN (`dns.RCodeError`), the way UDP and
+  DoH servers do. Upstream returns the resolver's own error, which is neither
+  an `RCodeError` nor `ErrEmptyResponse`, so the `dns` outbound answered such
+  a query with nothing (the client waited out its timeout), and next to
+  another server's NXDOMAIN `mergeQueryErrors` saw two different errors and
+  did the same. HYPER CLIENT's desktop TUN resolves direct names through
+  `localhost` since 26.10.2026: the desktop Core (`-dns network`) makes Go's
+  default resolver the network's own DNS.
+
 To update: change the version in libXray's `go.mod` `require`, run
 `go mod download github.com/xtls/xray-core@<version>`, copy that module over
 this directory with the same exclusions, re-apply the marked changes, keep
 this file, then `go test ./app/router -run TestProcessLookupUsesTheOriginalTarget`
-here and `go build ./... && go test ./...` in libXray.
+and `go test ./app/dns -run TestLocal` here and `go build ./... && go test ./...`
+in libXray.
